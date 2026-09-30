@@ -120,37 +120,11 @@ To demonstrate production readiness within the Government of Canada digital envi
 
 ```mermaid
 flowchart TD
-    %% Automated CI/CD Pipeline
-    subgraph DevOps ["Automated CI/CD Pipeline (GitHub Actions)"]
-        Git["Git Commit / Main"] --> CI["CI: Pytest & Coverage 90%+"]
-        CI --> CD["CD: Docker Build & Push to ACR"]
-    end
-
-    %% Edge Security & Ingress
-    subgraph Edge ["Perimeter Defense & Traffic Ingress"]
-        Users["External Analysts / Users"] --> WAF["Azure Front Door / WAF (Layer 7 Rules)"]
-        WAF --> Ingress["API Gateway / Ingress Controller"]
-    end
-
-    %% Private Virtual Network
-    subgraph VNet ["Private Virtual Network (VNet)"]
-        subgraph ComputeSubnet ["Compute Subnet (Private Routing)"]
-            App["Azure Container Apps / AKS Cluster"]
-            Probes["/health/live & /health/ready Probes"]
-            App --- Probes
-        end
-
-        subgraph DataSubnet ["Data Subnet (No Public IP)"]
-            DB[("Azure Database for PostgreSQL")]
-            KV[("Azure Key Vault")]
-        end
-    end
-
-    %% Deploy & Traffic Connections
-    CD -.->|"Zero-Downtime Rolling Update"| App
-    Ingress -->|"Internal Traffic"| App
-    App -->|"Secretless Auth (Managed Identity)"| DB
-    App -->|"Private Link (Private Endpoints)"| KV
+    Raw["Raw Excel Datasets<br/>(data/data.xlsx)"] --> ETL["ETL Reconciliation Engine<br/>(app/pipeline.py)"]
+    ETL -.->|"Low-confidence anomalies"| DLQ["Dead-Letter Queue Audit<br/>(data_quarantine.csv)"]
+    ETL --> DB[("Relational Storage Layer<br/>SQLite / PostgreSQL")]
+    DB <--> API["FastAPI Application Layer<br/>(app/main.py)"]
+    API --> Clients["PBO Analytical Consumers<br/>(R / Python / Excel / BI)"]
 ```
 
 ### Key Enterprise Features:

@@ -30,7 +30,6 @@ Security risks were evaluated and prioritized based on vulnerability severity, e
 
 * **Minimal Base Image**: The container utilizes `python:3.11-slim`, significantly reducing the operating system footprint and reducing known CVE surfaces.
 * **Deterministic Build Dependencies**: Production dependencies in `requirements.txt` are constrained with minimum version specifications to prevent upstream breaking changes or dependency tampering.
-
 ---
 
 ## 3. DevSecOps: Automated Supply Chain & Secret Scanning
@@ -42,10 +41,10 @@ flowchart TD
     Commit["Git Commit / Pull Request"] --> Gate["GitHub Actions Quality Gate"]
 
     subgraph SecurityChecks ["Automated Validation Gates"]
-        Test["1. Test Suite & Coverage (pytest >= 90%)"]
-        Secrets["2. Secret Leak Detection (Gitleaks / Trivy)"]
-        SAST["3. Static Code Analysis (Bandit / Checkmarx)"]
-        Container["4. Container Image Vulnerability (Aqua Trivy)"]
+        Test["1. Test Suite<br/>pytest & cov >= 90%"]
+        Secrets["2. Secret Scanning<br/>Gitleaks / Trivy"]
+        SAST["3. Static Analysis<br/>Bandit / Checkmarx"]
+        Container["4. Container Vulnerability<br/>Aqua Trivy / Snyk"]
     end
 
     Gate --> Test
@@ -53,7 +52,7 @@ flowchart TD
     Gate --> SAST
     Gate --> Container
 
-    Test --> Promotion["Approved Build / Artifact Promotion"]
+    Test --> Promotion["Approved Build /<br/>Artifact Promotion"]
     Secrets --> Promotion
     SAST --> Promotion
     Container --> Promotion
@@ -61,33 +60,23 @@ flowchart TD
 
 * **Immediate CI Enhancement**: Integrating open-source SAST (`bandit -r app/`) and vulnerability auditing (`pip-audit`) can be added directly to `.github/workflows/ci.yml` in under 10 lines of YAML.
 
-## 4. Cloud Roadmap: Government of Canada "Protected B" Architecture
+## 4. Enterprise Auditing & Centralized Telemetry
 
-For enterprise cloud deployment (e.g., Azure Canada Central or AWS Canada Central), the architecture evolves to satisfy federal Protected B compliance requirements:
-```mermaid
+For deployment within federal cloud environments (e.g., Azure Government Canada), runtime auditability and Protected B compliance are satisfied via centralized SIEM integration:
 flowchart TD
-    Internet["Internet Traffic (TLS 1.3 Encryption in Transit)"] --> WAF["Azure Front Door / Application Gateway + WAF<br/>(OWASP Rules, DDoS Protection, Rate Limiting)"]
-
-    subgraph ProtectedVNet ["Private Virtual Network (Protected B Profile)"]
-        subgraph ComputeSubnet ["Compute Subnet (Private VNet Peering)"]
-            AppService["Azure Container Apps / AKS Cluster<br/>(Non-root API Pods, System-Assigned Managed Identity)"]
-        end
-
-        subgraph DataSubnet ["Data Subnet (Fully Isolated, No Public IP)"]
-            DB[("Azure Database for PostgreSQL<br/>(Encrypted at Rest with CMK AES-256)")]
-        end
+    API["Azure Container Apps / AKS<br/>(Structured JSON Logs via stdout)"] --> Hub["Azure Event Hub /<br/>Log Analytics Workspace"]
+    
+    subgraph EnterpriseSIEM ["Centralized Security Monitoring & Compliance"]
+        SIEM["Microsoft Sentinel (SIEM)<br/>- Real-time Threat Analytics<br/>- HTTP 4xx/5xx Anomaly Detection<br/>- Immutable LAC Compliant Retention"]
     end
 
-    WAF --> ComputeSubnet
-    AppService -->|"Private Link & Secretless Auth (Entra ID)"| DB
-```
+    Hub --> SIEM
 
 ### Key Architectural Controls:
 
 1. **Secretless Authentication via Managed Identity (MI)**:
-   * Eliminate stored credentials in environment variables or configuration files.
-   * Compute instances authenticate directly to relational databases and Azure Key Vault via temporary Entra ID OAuth tokens.
-2. **Network Perimeter Defense (Private Endpoints)**:
-   * Databases and storage assets have zero public endpoints. All traffic traverses internal Virtual Network (VNet) private IP addresses.
-3. **Auditability & Log Immutability**:
-   * API access logs, container metrics, and readiness probe diagnostics are streamed to a centralized Security Information and Event Management (SIEM) system (Azure Monitor / Log Analytics) with retention policies adhering to Library and Archives Canada guidelines.
+   * Eliminates stored connection strings. APIs authenticate directly to Azure PostgreSQL and Key Vault using ephemeral Entra ID (Azure AD) tokens.
+2. **Network Isolation (Private Endpoints):**:
+   * Databases and backing services are provisioned strictly without public IP addresses, accessible solely via Virtual Network (VNet) private routing.
+3. **Structured Audit Logging:**:
+   * Incoming requests log client IP hashes, endpoint paths, response codes, and query latencies, streaming directly to Azure Event Hub / Log Analytics for real-time threat detection.
