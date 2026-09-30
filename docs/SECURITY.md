@@ -62,14 +62,14 @@ flowchart TD
 
 ## 4. Enterprise Auditing & Centralized Telemetry (Future Cloud Roadmap)
 
-For deployment within federal cloud environments (e.g., Azure Government Canada), runtime auditability and Protected B compliance are satisfied via centralized SIEM integration:
+For deployment within federal cloud environments (e.g., Azure), runtime auditability and Protected B compliance are satisfied via centralized SIEM integration:
 
 ```mermaid
 flowchart TD
     API["Azure Container Apps / AKS<br/>(Structured JSON Logs<br/>via stdout)"] --> Hub["Azure Event Hub /<br/>Log Analytics Workspace"]
     
     subgraph EnterpriseSIEM ["Centralized Security Monitoring & Compliance"]
-        SIEM["Microsoft Sentinel (SIEM)<br/>- Real-time Threat Analytics<br/>- HTTP 4xx/5xx Anomaly<br/>  Detection<br/>- Immutable LAC Compliant<br/>  Retention"]
+        SIEM["Enterprise SIEM (Sentinel / Splunk)<br/>- Real-time Threat Analytics<br/>- HTTP 4xx/5xx Anomaly<br/>  Detection<br/>- Immutable LAC Compliant<br/>  Retention"]
     end
 
     Hub --> SIEM
@@ -81,5 +81,5 @@ flowchart TD
    * Eliminates stored connection strings. APIs authenticate directly to Azure PostgreSQL and Key Vault using ephemeral Entra ID (Azure AD) tokens.
 2. **Network Isolation (Private Endpoints)**:
    * Databases and backing services are provisioned strictly without public IP addresses, accessible solely via Virtual Network (VNet) private routing.
-3. **Structured Audit Logging:**:
-   * Incoming requests log client IP hashes, endpoint paths, response codes, and query latencies, streaming directly to Azure Event Hub / Log Analytics for real-time threat detection.
+3. **Structured Audit Logging**:
+   * Application-layer structured logs (client IP hashes, query latencies, status codes) will stream asynchronously from container into centralized telemetry ingestion (e.g., Azure Event Hub) and forward directly into enterprise SIEM platforms such as Microsoft Sentinel or Splunk for automated anomaly detection and LAC-compliant audit retention.
