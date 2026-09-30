@@ -63,6 +63,8 @@ flowchart TD
 ## 4. Enterprise Auditing & Centralized Telemetry
 
 For deployment within federal cloud environments (e.g., Azure Government Canada), runtime auditability and Protected B compliance are satisfied via centralized SIEM integration:
+
+```mermaid
 flowchart TD
     API["Azure Container Apps / AKS<br/>(Structured JSON Logs via stdout)"] --> Hub["Azure Event Hub /<br/>Log Analytics Workspace"]
     

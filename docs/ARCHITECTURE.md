@@ -8,12 +8,11 @@ The service transitions raw, inconsistent departmental spreadsheets into clean, 
 
 ```mermaid
 flowchart TD
-    Raw["📂 Raw Excel Datasets<br/>(data/data.xlsx)"] --> ETL["⚙️ ETL Reconciliation Engine<br/>(app/pipeline.py)"]
-    ETL -.->|"Low-confidence anomalies"| DLQ["📋 Dead-Letter Queue Audit<br/>(data_quarantine.csv)"]
-    ETL --> DB[("🗄️ Relational Storage Layer<br/>SQLite / PostgreSQL")]
-    DB <--> API["⚡ FastAPI Application Layer<br/>(app/main.py)"]
-    API --> Clients["👥 PBO Analytical Consumers<br/>(R / Python / Excel / BI)"]
-
+    Raw["Raw Excel Datasets<br/>(data/data.xlsx)"] --> ETL["ETL Reconciliation Engine<br/>(app/pipeline.py)"]
+    ETL -.->|"Low-confidence anomalies"| DLQ["Dead-Letter Queue Audit<br/>(data_quarantine.csv)"]
+    ETL --> DB[("Relational Storage Layer<br/>SQLite / PostgreSQL")]
+    DB <--> API["FastAPI Application Layer<br/>(app/main.py)"]
+    API --> Clients["PBO Analytical Consumers<br/>(R / Python / Excel / BI)"]
 ```
 
 
@@ -117,15 +116,36 @@ The system architecture addresses the practical needs of adapting data delivery 
 ## 6. Enterprise Cloud Evolution: Protected B & Scalability Blueprint
 
 To demonstrate production readiness within the Government of Canada digital environment, the diagram below outlines how this prototype scales to a fully automated, Protected B cloud deployment:
-
 ```mermaid
 flowchart TD
-    Raw["Raw Excel Datasets<br/>(data/data.xlsx)"] --> ETL["ETL Reconciliation Engine<br/>(app/pipeline.py)"]
-    ETL -.->|"Low-confidence anomalies"| DLQ["Dead-Letter Queue Audit<br/>(data_quarantine.csv)"]
-    ETL --> DB[("Relational Storage Layer<br/>SQLite / PostgreSQL")]
-    DB <--> API["FastAPI Application Layer<br/>(app/main.py)"]
-    API --> Clients["PBO Analytical Consumers<br/>(R / Python / Excel / BI)"]
-```
+    subgraph DevOps ["Automated CI/CD Pipeline (GitHub Actions)"]
+        Git[Git Commit / Main] --> CI["CI: Pytest & Coverage 90%+"]
+        CI --> CD["CD: Docker Build & Push to ACR"]
+    end
+
+    subgraph Edge ["Perimeter Defense & Ingress"]
+        Users[External Analysts / Users] --> WAF["Azure Front Door / WAF (Layer 7 Rules)"]
+        WAF --> Ingress[API Gateway / Ingress Controller]
+    end
+
+    subgraph VNet ["Private Virtual Network (VNet)"]
+        subgraph ComputeSubnet ["Compute Subnet (Private Routing)"]
+            App["Azure Container Apps / AKS Cluster"]
+            Probes["/health/live & /health/ready Probes"]
+            App --- Probes
+        end
+
+        subgraph DataSubnet ["Data Subnet (No Public IP)"]
+            DB[("Azure Database for PostgreSQL")]
+            KV[("Azure Key Vault")]
+        end
+    end
+
+    CD -.->|"Zero-Downtime Rolling Update"| App
+    Ingress -->|"Internal Traffic"| App
+    App -->|"Secretless Auth (Managed Identity)"| DB
+    App -->|"Private Link (Private Endpoints)"| KV
+
 
 ### Key Enterprise Features:
 * **Zero-Downtime Continuous Deployment (CD)**: Builds container images, tags with Git SHA, pushes to private container registries (ACR), and executes blue/green rolling deployments.
