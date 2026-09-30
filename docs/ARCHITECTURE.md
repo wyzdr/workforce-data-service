@@ -116,35 +116,40 @@ The system architecture addresses the practical needs of adapting data delivery 
 ## 6. Enterprise Cloud Evolution: Protected B & Scalability Blueprint
 
 To demonstrate production readiness within the Government of Canada digital environment, the diagram below outlines how this prototype scales to a fully automated, Protected B cloud deployment:
+
 ```mermaid
 flowchart TD
+    %% Automated CI/CD Pipeline
     subgraph DevOps ["Automated CI/CD Pipeline (GitHub Actions)"]
-        Git[Git Commit / Main] --> CI["CI: Pytest & Coverage 90%+"]
-        CI --> CD["CD: Docker Build & Push to ACR"]
+        Git["Git Commit / Main"] --> CI["CI: Pytest & Coverage 90%+"]
+        CI --> CD["CD: Docker Build &<br/>Push to ACR"]
     end
 
+    %% Edge Security & Ingress
     subgraph Edge ["Perimeter Defense & Ingress"]
-        Users[External Analysts / Users] --> WAF["Azure Front Door / WAF (Layer 7 Rules)"]
-        WAF --> Ingress[API Gateway / Ingress Controller]
+        Users["External Analysts / Users"] --> WAF["Azure Front Door / WAF<br/>(Layer 7 Rules)"]
+        WAF --> Ingress["API Gateway /<br/>Ingress Controller"]
     end
 
+    %% Private Virtual Network
     subgraph VNet ["Private Virtual Network (VNet)"]
         subgraph ComputeSubnet ["Compute Subnet (Private Routing)"]
-            App["Azure Container Apps / AKS Cluster"]
-            Probes["/health/live & /health/ready Probes"]
+            App["Azure Container Apps /<br/>AKS Cluster"]
+            Probes["/health/live &<br/>/health/ready Probes"]
             App --- Probes
         end
 
         subgraph DataSubnet ["Data Subnet (No Public IP)"]
-            DB[("Azure Database for PostgreSQL")]
+            DB[("Azure Database for<br/>PostgreSQL")]
             KV[("Azure Key Vault")]
         end
     end
 
-    CD -.->|"Zero-Downtime Rolling Update"| App
-    Ingress -->|"Internal Traffic"| App
-    App -->|"Secretless Auth (Managed Identity)"| DB
-    App -->|"Private Link (Private Endpoints)"| KV
+    %% Deploy & Traffic Connections
+    CD -.->|"Zero-Downtime<br/>Rolling Update"| App
+    Ingress -->|"Internal Routed<br/>Traffic"| App
+    App -->|"Secretless Auth<br/>(Managed Identity)"| DB
+    App -->|"Private Link<br/>(Private Endpoints)"| KV
 ```
 
 ### Key Enterprise Features:

@@ -66,10 +66,10 @@ For deployment within federal cloud environments (e.g., Azure Government Canada)
 
 ```mermaid
 flowchart TD
-    API["Azure Container Apps / AKS<br/>(Structured JSON Logs via stdout)"] --> Hub["Azure Event Hub /<br/>Log Analytics Workspace"]
+    API["Azure Container Apps / AKS<br/>(Structured JSON Logs<br/>via stdout)"] --> Hub["Azure Event Hub /<br/>Log Analytics Workspace"]
     
     subgraph EnterpriseSIEM ["Centralized Security Monitoring & Compliance"]
-        SIEM["Microsoft Sentinel (SIEM)<br/>- Real-time Threat Analytics<br/>- HTTP 4xx/5xx Anomaly Detection<br/>- Immutable LAC Compliant Retention"]
+        SIEM["Microsoft Sentinel (SIEM)<br/>- Real-time Threat Analytics<br/>- HTTP 4xx/5xx Anomaly<br/>  Detection<br/>- Immutable LAC Compliant<br/>  Retention"]
     end
 
     Hub --> SIEM
