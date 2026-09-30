@@ -37,44 +37,49 @@ Security risks were evaluated and prioritized based on vulnerability severity, e
 
 To guarantee continuous assurance, the CI pipeline is architected to support immediate DevSecOps gate expansions:
 
-```text
-[ Git Commit ]
-│
-▼
-[ GitHub Actions Quality Gate ]
-├── 1. Code Quality & Test Suite (pytest, pytest-cov >= 90%)
-├── 2. Secret Leak Detection (Trivy / Gitleaks / GitGuardian)
-├── 3. Static Application Security Testing - SAST (Checkmarx / Bandit)
-└── 4. Container Vulnerability Scan (Aqua Trivy / Snyk)
-│
-▼
-[ Approved Build / Artifact Promotion ]
+```mermaid
+flowchart TD
+    Commit["Git Commit / Pull Request"] --> Gate["GitHub Actions Quality Gate"]
+
+    subgraph SecurityChecks ["Automated Validation Gates"]
+        Test["1. Test Suite & Coverage (pytest >= 90%)"]
+        Secrets["2. Secret Leak Detection (Gitleaks / Trivy)"]
+        SAST["3. Static Code Analysis (Bandit / Checkmarx)"]
+        Container["4. Container Image Vulnerability (Aqua Trivy)"]
+    end
+
+    Gate --> Test
+    Gate --> Secrets
+    Gate --> SAST
+    Gate --> Container
+
+    Test --> Promotion["Approved Build / Artifact Promotion"]
+    Secrets --> Promotion
+    SAST --> Promotion
+    Container --> Promotion
 ```
 
 * **Immediate CI Enhancement**: Integrating open-source SAST (`bandit -r app/`) and vulnerability auditing (`pip-audit`) can be added directly to `.github/workflows/ci.yml` in under 10 lines of YAML.
 
----
-
 ## 4. Cloud Roadmap: Government of Canada "Protected B" Architecture
 
 For enterprise cloud deployment (e.g., Azure Canada Central or AWS Canada Central), the architecture evolves to satisfy federal Protected B compliance requirements:
+```mermaid
+flowchart TD
+    Internet["Internet Traffic (TLS 1.3 Encryption in Transit)"] --> WAF["Azure Front Door / Application Gateway + WAF<br/>(OWASP Rules, DDoS Protection, Rate Limiting)"]
 
-```text
-[ Internet Traffic ]
-│ (TLS 1.3 Encryption in Transit)
-▼
-[ Azure Front Door / Application Gateway + WAF ]
-Layer 7 OWASP Top 10 Rules, DDoS Protection, Rate Limiting
-│
-▼ (Private VNet Peering)
-[ Compute Subnet: Azure Container Apps / AKS ]
-Non-root API pods with System-Assigned Managed Identity (MI)
-│
-▼ (Azure Private Link / Private Endpoint)
-[ Data Subnet: Azure Database for PostgreSQL (Flexible Server) ]
-Fully isolated from public internet; zero public IP
-Secretless database authentication via Microsoft Entra ID (Azure AD)
-Data encrypted at rest via Customer-Managed Keys (CMK / AES-256)
+    subgraph ProtectedVNet ["Private Virtual Network (Protected B Profile)"]
+        subgraph ComputeSubnet ["Compute Subnet (Private VNet Peering)"]
+            AppService["Azure Container Apps / AKS Cluster<br/>(Non-root API Pods, System-Assigned Managed Identity)"]
+        end
+
+        subgraph DataSubnet ["Data Subnet (Fully Isolated, No Public IP)"]
+            DB[("Azure Database for PostgreSQL<br/>(Encrypted at Rest with CMK AES-256)")]
+        end
+    end
+
+    WAF --> ComputeSubnet
+    AppService -->|"Private Link & Secretless Auth (Entra ID)"| DB
 ```
 
 ### Key Architectural Controls:
