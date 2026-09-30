@@ -62,6 +62,31 @@ flowchart LR
 * **The Context**: In federal workforce reporting, security and defense entities (e.g., RCMP, DND) occasionally report personnel counts under a blanket "Combined" category rather than granular breakdowns.
 * **Our Pragmatic Assumption**: In this prototype, "Combined" is mapped to "indeterminate" under the operational rationale that core regular-force members represent permanent, continuing positions.
 * **Flexibility Notice**: We openly acknowledge this is an analytical assumption driven by limited domain context. The transformation logic in `DataCleaningPipeline.normalize_tenure` is purposely decoupled. Should departmental stakeholders specify an alternative apportionment rule (e.g., allocating a fixed percentage to term or reporting as a dedicated statutory slice), this mapping can be altered with a single configuration adjustment without altering the underlying database schema.
+### 2.1 Tackling Real Dirty Data in `data.xlsx`
+During source data exploration, our pipeline encountered and resolved several tangible data traps:
+* **Invisible Whitespace & Escaped Characters**: Department strings frequently contained trailing tabs, multiple contiguous spaces, and embedded line breaks (e.g., `"Department of Finance \n"` vs `"Department of Finance"`). Our pipeline applies text normalization (`DataCleaningPipeline.normalize_text`) before any matching.
+* **Bilingual Inconsistencies & Acronym Drifts**: Entities reported alternatively by their English name, French name, or operational acronyms (e.g., `"ASC"` vs `"Accessibility Standards Canada"` vs `"Normes d'accessibilité Canada"`). The pipeline dynamically builds a multi-key index from canonical metadata sheets.
+* **Typographical Variants**: Near-miss spelling differences are caught using Levenshtein distance heuristics (`difflib.get_close_matches` with an $0.85$ confidence cutoff), preventing dropped records without manual intervention.
+
+### 2.2 Ingestion Engine Workflow
+
+```mermaid
+flowchart TD
+    A[Raw Input Record] --> B{Clean Text Normalize}
+    B --> C{Canonical Match or Cache Hit?}
+    C -- Yes --> D[Assign Canonical Dept ID]
+    C -- No --> E{Levenshtein Fuzzy Match >= 0.85?}
+    E -- Yes --> F[Update Cache & Assign Dept ID]
+    E -- No --> G[Isolate into Dead-Letter Queue DLQ]
+    G --> H[Export data_quarantine.csv for Analyst Review]
+    D --> I[Insert into Relational Store]
+    F --> I
+```
+
+### 2.3 Business Assumption: Handling "Combined" Tenure
+* **The Context**: In federal workforce reporting, security and defense entities (e.g., RCMP, DND) occasionally report personnel counts under a blanket "Combined" category rather than granular breakdowns.
+* **Our Pragmatic Assumption**: In this prototype, "Combined" is mapped to "indeterminate" under the operational rationale that core regular-force members represent permanent, continuing positions.
+* **Flexibility Notice**: We openly acknowledge this is an analytical assumption driven by limited domain context. The transformation logic in `DataCleaningPipeline.normalize_tenure` is purposely decoupled. Should departmental stakeholders specify an alternative apportionment rule (e.g., allocating a fixed percentage to term or reporting as a dedicated statutory slice), this mapping can be altered with a single configuration adjustment without altering the underlying database schema.
 
 ---
 
@@ -158,6 +183,38 @@ flowchart TD
         GitPush[Git Push Main] --> CI[GitHub Actions: Pytest & Lint]
         CI --> CD[CD: Docker Build & ACR Push]
         CD --> Rollout[Zero-Downtime Blue/Green Deploy]
+    end
+```
+
+### Key Enterprise Features:
+* **Zero-Downtime Continuous Deployment (CD)**: Builds container images, tags with Git SHA, pushes to private container registries (ACR), and executes blue/green rolling deployments.
+* **Auto-Scaling with KEDA**: Dynamically scales compute pods from 1 to 20 instances in response to peak budget cycle inquiry loads, scaling to zero off-hours to optimize cloud spend (FinOps).
+* **High Availability & Geographic Redundancy**: Multi-zone replication across Azure Canada Central and Canada East ensures continuity during parliamentary debate cycles.
+## 6. Enterprise Cloud Evolution: Protected B & Scalability Blueprint
+
+To demonstrate production readiness within the Government of Canada digital environment, the diagram below outlines how this prototype scales to a fully automated, Protected B cloud deployment:
+
+```mermaid
+flowchart TD
+    subgraph Edge & Security Perimeter
+        Client[External Analysts / Users] --> FrontDoor[Azure Front Door / WAF]
+        FrontDoor --> APIGW[API Gateway / Ingress Controller]
+    end
+
+    subgraph Private VNet - Compute Subnet
+        APIGW --> K8s[Azure Container Apps / AKS Auto-Scaling Cluster]
+        K8s --> Probes{K8s Probes /health/live & ready}
+    end
+
+    subgraph Private VNet - Data Subnet (No Public IP)
+        K8s -- "Zero-Credential Managed Identity (MI)" --> DB[(Azure Database for PostgreSQL)]
+        K8s -- "Private Link" --> KV[(Azure Key Vault)]
+    end
+
+    subgraph Automated DevOps & CD Pipeline
+        GitPush[Git Push Main] --> CI[GitHub Actions: Pytest & Lint]
+        CI --> CD[CD: Docker Build & Push to Azure ACR]
+        CD --> Rollout[Zero-Downtime Blue/Green Rolling Update]
     end
 ```
 
