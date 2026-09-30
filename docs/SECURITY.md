@@ -10,7 +10,7 @@ Security risks were evaluated and prioritized based on vulnerability severity, e
 
 | Threat Vector | OWASP API Category | Initial Risk | Implemented Mitigation | Residual Risk | Implementation Evidence |
 | :--- | :--- | :---: | :--- | :---: | :--- |
-| **SQL Injection (SQLi)** | API8:2023 Security Misconfiguration | **HIGH** | **Strict Parameterization**: Queries use SQLAlchemy 2.0 ORM expressions. Raw SQL concatenation is entirely prohibited. | **LOW** | [`app/main.py:get_department_fte`](../app/main.py) |
+| **SQL Injection (SQLi)** | OWASP Top 10: Injection (API10:2023) | **HIGH** | **Strict Parameterization**: Queries use SQLAlchemy 2.0 ORM expressions. Raw SQL concatenation is entirely prohibited. | **LOW** | [`app/main.py:get_department_fte`](../app/main.py) |
 | **Projection / Property Injection** | API3:2023 Broken Object Property Level Authorization | **MEDIUM** | **Strict Whitelist Verification**: The `tenure` parameter is checked against a static set (`{"indeterminate", "term", "casual", "student", "missing"}`). Invalid entries immediately abort with HTTP 400. | **LOW** | [`app/main.py:get_department_fte`](../app/main.py) |
 | **Container Privilege Escalation** | CWE-250 Unnecessary Privileges | **MEDIUM** | **Non-Root Execution**: Provisions and executes via a locked-down system user (`appuser`, UID 10001). | **LOW** | [`Dockerfile:USER appuser`](../Dockerfile) |
 | **Resource Depletion / DoS** | API4:2023 Unrestricted Resource Consumption | **MEDIUM** | **Pydantic Type Boundaries**: Non-integer IDs or queries trigger instant 422 rejections at the gateway layer. Compound indices prevent table-scanning query attacks. | **LOW** | [`app/models.py:idx_dept_year_quarter`](../app/models.py) |
@@ -79,7 +79,7 @@ flowchart TD
 
 1. **Secretless Authentication via Managed Identity (MI)**:
    * Eliminates stored connection strings. APIs authenticate directly to Azure PostgreSQL and Key Vault using ephemeral Entra ID (Azure AD) tokens.
-2. **Network Isolation (Private Endpoints):**:
+2. **Network Isolation (Private Endpoints)**:
    * Databases and backing services are provisioned strictly without public IP addresses, accessible solely via Virtual Network (VNet) private routing.
 3. **Structured Audit Logging:**:
    * Incoming requests log client IP hashes, endpoint paths, response codes, and query latencies, streaming directly to Azure Event Hub / Log Analytics for real-time threat detection.

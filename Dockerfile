@@ -10,10 +10,15 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 FROM python:3.11-slim
 WORKDIR /app
 
-# Comply with federal IT security standards: run as dedicated non-root user
-RUN useradd -u 8888 appuser && chown -R appuser:appuser /app
-COPY --from=builder /root/.local /home/appuser/.local
+# Comply with federal IT security standards: create home dir (-m) and dedicated non-root user (UID 10001)
+RUN useradd -m -u 10001 appuser
+
+# Copy installed Python packages to appuser's local directory with correct ownership
+COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
+
+# Copy application source code and grant write ownership to appuser for SQLite generation
 COPY --chown=appuser:appuser . .
+RUN chown -R appuser:appuser /app
 
 USER appuser
 ENV PATH=/home/appuser/.local/bin:$PATH \
@@ -21,5 +26,5 @@ ENV PATH=/home/appuser/.local/bin:$PATH \
 
 EXPOSE 8000
 
-# Run on container
+# Automatically run ETL pipeline on startup, then launch FastAPI
 CMD ["sh", "-c", "python import_data.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
