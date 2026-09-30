@@ -62,7 +62,7 @@ You can run this application either using **Docker** (recommended for zero-depen
    uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
    ```
 
-   Access the service at [http://localhost:8000](http://localhost:8000).
+   Access the service at [http://localhost:8000/docs](http://localhost:8000/docs).
 
 ---
 
