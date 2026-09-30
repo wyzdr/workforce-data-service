@@ -20,4 +20,6 @@ ENV PATH=/home/appuser/.local/bin:$PATH \
     PYTHONUNBUFFERED=1
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Run on container
+CMD ["sh", "-c", "python import_data.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
