@@ -1,12 +1,12 @@
 # Security Architecture & Threat Risk Assessment
 
-This document outlines the security controls, prioritized threat mitigation matrix, and enterprise auditing strategy implemented in the **PBO Workforce Data Service**, adhering to **OWASP API Security Top 10** standards and Government of Canada **Protected B** recommendations.
+This document outlines the security controls, prioritized threat mitigation matrix, and enterprise auditing strategy, adhering to **OWASP API Security Top 10** standards and Government of Canada **Protected B** recommendations.
 
 ---
 
 ## 1. Threat Modeling & Risk Prioritization Matrix
 
-Security vectors were analyzed and prioritized based on impact severity, exploitability, and risk to parliamentary data integrity:
+Security risks were evaluated and prioritized based on vulnerability severity, exploitability, and potential impact on parliamentary data integrity:
 
 | Threat Vector | OWASP API Category | Initial Risk | Implemented Mitigation | Residual Risk | Implementation Evidence |
 | :--- | :--- | :---: | :--- | :---: | :--- |
@@ -20,14 +20,16 @@ Security vectors were analyzed and prioritized based on impact severity, exploit
 
 ## 2. Implemented Defense-in-Depth
 
-### 2.1 Application Gateway & Input Sanitation
-* **Pydantic Structural Enforcement**: Fast-failing input filters prevent malformed payloads from consuming worker CPU.
-* **Deterministic Configuration**: All runtime settings are externalized to environment variables; no secrets, tokens, or credentials exist in the source code.
-* **Orchestration Probes**: Probes at `/health/live` and `/health/ready` verify internal health and database connectivity, ensuring unhealthy pods are severed from traffic instantly.
+### 2.1 Application-Level Defenses
 
-### 2.2 Container Hardening
-* **Non-Root Execution Context**: The container runs under an unprivileged `appuser`. In the event of a zero-day application compromise, host root access cannot be achieved.
-* **Read-Only / Ephemeral Boundaries**: The runtime container does not require elevated host capabilities or host volume bindings.
+* **Strict Type Safety**: Query parameters are typed and parsed via Pydantic/FastAPI (`id: int`, `year: Optional[int]`). Any malformed input (e.g., passing string characters into `id`) fails at the gateway layer with HTTP 422 before reaching business logic.
+* **Zero Hardcoded Secrets**: No database passwords, private keys, or API tokens are checked into the repository. Configuration parameters are externalized through environment variables.
+* **Probes for Cluster Health**: Orchestration platforms (Kubernetes / Azure App Service) can continuously verify process liveness (`/health/live`) and database connectivity readiness (`/health/ready`) to prevent routing traffic to unhealthy instances.
+
+### 2.2 Container & Supply Chain Security
+
+* **Minimal Base Image**: The container utilizes `python:3.11-slim`, significantly reducing the operating system footprint and reducing known CVE surfaces.
+* **Deterministic Build Dependencies**: Production dependencies in `requirements.txt` are constrained with minimum version specifications to prevent upstream breaking changes or dependency tampering.
 
 ---
 
@@ -53,24 +55,34 @@ To guarantee continuous assurance, the CI pipeline is architected to support imm
 
 ---
 
-## 4. Enterprise Auditing & Centralized Telemetry
+## 4. Cloud Roadmap: Government of Canada "Protected B" Architecture
 
-For deployment within federal cloud environments (e.g., Azure Government Canada), runtime auditability is satisfied via centralized SIEM integration:
+For enterprise cloud deployment (e.g., Azure Canada Central or AWS Canada Central), the architecture evolves to satisfy federal Protected B compliance requirements:
 
 ```text
-[ Container Apps / AKS ]
-│ (Structured JSON Diagnostic Logs via stdout)
+[ Internet Traffic ]
+│ (TLS 1.3 Encryption in Transit)
 ▼
-[ Azure Monitor Log Analytics / Event Hub ]
+[ Azure Front Door / Application Gateway + WAF ]
+Layer 7 OWASP Top 10 Rules, DDoS Protection, Rate Limiting
 │
-▼
-[ Centralized SIEM / Microsoft Sentinel ]
-  ├── Immutable Audit Trails
-  ├── Unauthorized Access Pattern Alerts (HTTP 4xx Spikes)
-  └── Retention Compliant with Library and Archives Canada Regulations
+▼ (Private VNet Peering)
+[ Compute Subnet: Azure Container Apps / AKS ]
+Non-root API pods with System-Assigned Managed Identity (MI)
+│
+▼ (Azure Private Link / Private Endpoint)
+[ Data Subnet: Azure Database for PostgreSQL (Flexible Server) ]
+Fully isolated from public internet; zero public IP
+Secretless database authentication via Microsoft Entra ID (Azure AD)
+Data encrypted at rest via Customer-Managed Keys (CMK / AES-256)
 ```
 
-### Key Enterprise Security Controls:
-1. **Secretless Infrastructure (Managed Identity)**: Eliminates stored connection strings. APIs authenticate directly to Azure PostgreSQL and Key Vault using ephemeral Entra ID (Azure AD) tokens.
-2. **Network Isolation (Private Endpoints)**: Databases and backing services are provisioned strictly without public IP addresses, accessible solely via Virtual Network (VNet) private routing.
-3. **Structured Audit Logging**: Incoming requests log client IP hashes, endpoint paths, response codes, and query latencies, streaming directly to Azure Event Hub / Log Analytics for real-time threat detection.
+### Key Architectural Controls:
+
+1. **Secretless Authentication via Managed Identity (MI)**:
+   * Eliminate stored credentials in environment variables or configuration files.
+   * Compute instances authenticate directly to relational databases and Azure Key Vault via temporary Entra ID OAuth tokens.
+2. **Network Perimeter Defense (Private Endpoints)**:
+   * Databases and storage assets have zero public endpoints. All traffic traverses internal Virtual Network (VNet) private IP addresses.
+3. **Auditability & Log Immutability**:
+   * API access logs, container metrics, and readiness probe diagnostics are streamed to a centralized Security Information and Event Management (SIEM) system (Azure Monitor / Log Analytics) with retention policies adhering to Library and Archives Canada guidelines.

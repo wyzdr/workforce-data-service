@@ -35,7 +35,7 @@ The service transitions raw, inconsistent departmental spreadsheets into clean, 
 
 ## 2. Ingestion & Entity Resolution: Real-World Data Challenges
 
-Federal department records seldom arrive clean. The ingestion engine (`app/pipeline.py`) replaces fragile, hardcoded dictionary lookups with a dynamic, fault-tolerant reconciliation strategy.
+External records seldom arrive clean. The data ingestion process (`import_data.py` and `app/pipeline.py`) addresses data inconsistencies across federal reporting bodies without relying on rigid, hardcoded dictionary aliases.
 
 ### 2.1 Tackling Real Dirty Data in `data.xlsx`
 During source data exploration, our pipeline encountered and resolved several tangible data traps:
@@ -113,23 +113,20 @@ Given the scope of this take-home exercise, architectural choices were selected 
 
 ---
 
-## 5. Tailoring Delivery to PBO Analysts & Workflows
+## 5. Supporting PBO Analysts & Downstream Workflows
 
-To bridge technical delivery with the daily realities of economic researchers and policy analysts:
+The system architecture addresses the practical needs of adapting data delivery to analytical staff and policy researchers:
 
-* **Native Tabular Interoperability (R, Python, Excel)**: Endpoints return flat, standardized JSON arrays that parse effortlessly into analytical DataFrames via one-liners:
-  * **Python**:
-    ```python
-    df = pd.read_json("http://localhost:8000/api/departments/1/fte")
-    ```
-  * **R**:
-    ```r
-    library(httr)
-    res <- GET("http://localhost:8000/api/departments/1/fte")
-    df <- jsonlite::fromJSON(content(res, "text"))
-    ```
-* **Payload Optimization via Dynamic Field Projection**: Analysts exploring casual staffing trends can pass `?tenure=casual` to retrieve only that metric, cutting network overhead and avoiding repetitive client-side array reshaping.
-* **Data Integrity Transparency**: Instead of hiding unclassified records, they are surfaced in the explicit `missing` bucket, while low-confidence entities are preserved in `data_quarantine.csv`. Analysts retain full visibility into data confidence levels during costing models.
+* **Frictionless Consumption Across Toolchains**:
+  * PBO analysts rely on diverse workflows ranging from statistical environments (R, Python) to spreadsheet modeling (Excel, Power BI).
+  * The API produces standardized, flat JSON structures designed for direct ingestion into analytical DataFrames, eliminating tedious manual reshaping.
+* **Targeted Querying (Reducing Client Overhead)**:
+  * Using optional parameters such as `?year=2021` and `?tenure=casual`, analysts can pull exact data slices directly into their costing models without needing to fetch and filter entire multi-year departmental series locally.
+* **Preserving Analytical Integrity & Transparency**:
+  * Public sector costing models require strict accountability. Instead of silently dropping malformed records or coercing unknown figures, the pipeline exposes unclassified FTEs via the explicit `missing` category and logs low-confidence matches to `data_quarantine.csv`. This ensures analysts have full visibility into data quality boundaries when preparing parliamentary estimates.
+* **Future Workflow Recommendations (Advisory)**:
+  * **Direct Tabular Export**: For analysts working predominantly in Excel, extending the API to support `Accept: text/csv` would allow one-click Power Query refresh without JSON parsing.
+  * **Scheduled Snapshot Feeds**: Generating pre-aggregated fiscal-year summary tables can accelerate recurring quarterly reports during intense parliamentary budget cycles.
 
 ---
 
@@ -139,26 +136,37 @@ To demonstrate production readiness within the Government of Canada digital envi
 
 ```mermaid
 flowchart TD
-    subgraph Edge ["Edge & Security Perimeter"]
-        Client[External Analysts / Users] --> FrontDoor[Azure Front Door / WAF]
-        FrontDoor --> APIGW[API Gateway / Ingress Controller]
+    %% Automated CI/CD Pipeline
+    subgraph DevOps ["🚀 Automated CI/CD Pipeline (GitHub Actions)"]
+        Git[Git Commit / Main] --> CI[CI: Pytest & Coverage 90%+]
+        CI --> CD[CD: Docker Build & Push to ACR]
     end
 
-    subgraph ComputeSubnet ["Private VNet: Compute Subnet"]
-        APIGW --> K8s[Azure Container Apps / AKS Cluster]
-        K8s --> Probes{K8s Health Probes}
+    %% Edge Security & Ingress
+    subgraph Edge ["🛡️ Perimeter Defense & Traffic Ingress"]
+        Users[External Analysts / Users] --> WAF[Azure Front Door / WAF (Layer 7 Rules)]
+        WAF --> Ingress[API Gateway / Ingress Controller]
     end
 
-    subgraph DataSubnet ["Private VNet: Data Subnet (No Public IP)"]
-        K8s -->|Managed Identity| DB[(Azure Database for PostgreSQL)]
-        K8s -->|Private Link| KV[(Azure Key Vault)]
+    %% Private Virtual Network
+    subgraph VNet ["🔒 Private Virtual Network (VNet)"]
+        subgraph ComputeSubnet ["Compute Subnet (Private Routing)"]
+            App[Azure Container Apps / AKS Cluster]
+            Probes["/health/live & /health/ready Probes"]
+            App --- Probes
+        end
+
+        subgraph DataSubnet ["Data Subnet (No Public IP)"]
+            DB[(Azure Database for PostgreSQL)]
+            KV[(Azure Key Vault)]
+        end
     end
 
-    subgraph CICD ["Automated DevOps & CD Pipeline"]
-        GitPush[Git Push Main] --> CI[GitHub Actions: Pytest & Lint]
-        CI --> CD[CD: Docker Build & ACR Push]
-        CD --> Rollout[Zero-Downtime Blue/Green Deploy]
-    end
+    %% Deploy & Traffic Connections
+    CD -.->|"Zero-Downtime Rolling Update"| App
+    Ingress -->|"Internal Traffic"| App
+    App -->|"Secretless Auth (Managed Identity)"| DB
+    App -->|"Private Link (Private Endpoints)"| KV
 ```
 
 ### Key Enterprise Features:
