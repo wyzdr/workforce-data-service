@@ -1,101 +1,167 @@
 # System Architecture & Technical Design Document
 
-This document provides an in-depth architectural breakdown of the **PBO Workforce Data Service**, detailing the ETL reconciliation pipeline, relational database modeling, key technical assumptions, trade-offs, and strategies for empowering downstream PBO analysts.
+This document provides a comprehensive technical overview of the **PBO Workforce Data Service**, covering the real-world ETL reconciliation challenges, database modeling, pragmatic technical trade-offs, and an enterprise cloud roadmap for downstream PBO analysts.
 
 ---
 
-## 1. High-Level System Architecture
+## 1. High-Level Architecture Overview
 
-The service bridges heterogeneous public sector data sources and downstream parliamentary analysis workflows through a robust, decoupled pipeline:
+The service transitions raw, inconsistent departmental spreadsheets into clean, standardized, and high-performance analytical REST interfaces:
 
 ```text
-[ Raw Excel Datasets ]
-│ (data/data.xlsx)
-▼
-[ ETL Reconciliation Engine ] ──► [ Dead-Letter Queue (DLQ) Audit ]
-app/pipeline.py (Levenshtein Fuzzy Matching, Memoization Cache)
+[ Raw Excel Datasets ] (data/data.xlsx)
 │
 ▼
-[ Structured Relational Storage ]
-SQLite (Production Prototype) / PostgreSQL Ready (SQLAlchemy ORM)
-Compound Indexing: (dept_id, year, quarter)
+[ ETL Ingestion & Reconciliation Engine ] ──► [ Dead-Letter Queue (DLQ) Audit ]
+  Tiered String Matching + Memoization Cache    (data_quarantine.csv)
+  Statutory Tenure Normalization
 │
 ▼
-[ FastAPI Service Layer ] ──► [ Container Probes: /health/live, /health/ready ]
-Parameter Whitelisting, Dynamic Projections, Open Data Contract
+[ Relational Storage Layer ]
+  Local Prototype: SQLite (Zero External Dependencies)
+  Production Ready: PostgreSQL (SQLAlchemy ORM Decoupled)
+  Compound Indexing: (dept_id, year, quarter)
 │
 ▼
-[ Downstream Clients: PBO Economists, Policy Analysts, Excel/R/BI Dashboards ]
+[ FastAPI High-Performance Application Layer ]
+  Liveness & Readiness Cluster Probes (/health/live, /health/ready)
+  Parameter Whitelisting & Dynamic Field Projection
+│
+▼
+[ PBO Analytical Consumers: R / Python / PowerBI / Excel Modeling Workflows ]
 ```
 
 ---
 
-## 2. Data Cleaning & Reconciliation Pipeline
+## 2. Ingestion & Entity Resolution: Real-World Data Challenges
 
-The data ingestion process (`import_data.py` and `app/pipeline.py`) addresses data inconsistencies across federal reporting bodies without relying on rigid, hardcoded dictionary aliases.
+Federal department records seldom arrive clean. The ingestion engine (`app/pipeline.py`) replaces fragile, hardcoded dictionary lookups with a dynamic, fault-tolerant reconciliation strategy.
 
-### 2.1 Multi-Tier Entity Resolution (`DataCleaningPipeline.resolve_department`)
+### 2.1 Tackling Real Dirty Data in `data.xlsx`
+During source data exploration, our pipeline encountered and resolved several tangible data traps:
+* **Invisible Whitespace & Escaped Characters**: Department strings frequently contained trailing tabs, multiple contiguous spaces, and embedded line breaks (e.g., `"Department of Finance \n"` vs `"Department of Finance"`). Our pipeline applies text normalization (`DataCleaningPipeline.normalize_text`) before any matching.
+* **Bilingual Inconsistencies & Acronym Drifts**: Entities reported alternatively by their English name, French name, or operational acronyms (e.g., `"ASC"` vs `"Accessibility Standards Canada"` vs `"Normes d'accessibilité Canada"`). The pipeline dynamically builds a multi-key index from canonical metadata sheets.
+* **Typographical Variants**: Near-miss spelling differences are caught using Levenshtein distance heuristics (`difflib.get_close_matches` with an $0.85$ confidence cutoff), preventing dropped records without manual intervention.
 
-Federal department names frequently exhibit minor spelling variants, acronym variations, or extraneous whitespace. The resolution follows a tiered fallback mechanism:
+### 2.2 Ingestion Engine Workflow
 
-1. **Tier 1: Canonical Exact Matching**: Inputs are normalized via `DataCleaningPipeline.normalize_text` (collapsing contiguous whitespaces, trimming ends) and checked against ground-truth keys derived dynamically from the canonical dimension tab.
-2. **Tier 2: Memoization Cache (`self.match_cache`)**: Once a raw variant is resolved, the result is stored in memory. Subsequent occurrences of the same string bypass string similarity algorithms, reducing computational time from $O(N \cdot M)$ to $O(1)$.
-3. **Tier 3: Fuzzy Matching Heuristic**: Unmatched names are evaluated against the canonical set using Levenshtein distance heuristics (`difflib.get_close_matches`) with a strict similarity cutoff ($0.85$ default). Matches meeting or exceeding this threshold are linked automatically.
-4. **Tier 4: Dead-Letter Queue (DLQ) Isolation**: Inputs falling below the confidence threshold are quarantined (`self.quarantine_records`) rather than dropped silently. Quarantined records can be exported via `export_quarantine_report()` to `data_quarantine.csv` for human-in-the-loop auditor review.
+```mermaid
+flowchart TD
+    A[Raw Input Record] --> B{Clean Text Normalize}
+    B --> C{Canonical Match or Cache Hit?}
+    C -- Yes --> D[Assign Canonical Dept ID]
+    C -- No --> E{Levenshtein Fuzzy Match >= 0.85?}
+    E -- Yes --> F[Update Cache & Assign Dept ID]
+    E -- No --> G[Isolate into Dead-Letter Queue DLQ]
+    G --> H[Export data_quarantine.csv for Analyst Review]
+    D --> I[Insert into Relational Store]
+    F --> I
+```
 
-### 2.2 Statutory Tenure Normalization (`DataCleaningPipeline.normalize_tenure`)
-
-Federal employment statuses are reconciled into the five statutory categories required by the API contract: `indeterminate`, `term`, `casual`, `student`, and `missing`.
-
-* **Domain Business Rule**: Records with a tenure label of `"Combined"` (frequently reported for military personnel and RCMP regular service members) are mapped to permanent `"indeterminate"` status, reflecting their operational permanence under federal career structures.
-* **Schema Boundary**: Null, missing, or unrecognized status labels default to `"missing"`, preventing schema violations downstream.
+### 2.3 Business Assumption: Handling "Combined" Tenure
+* **The Context**: In federal workforce reporting, security and defense entities (e.g., RCMP, DND) occasionally report personnel counts under a blanket "Combined" category rather than granular breakdowns.
+* **Our Pragmatic Assumption**: In this prototype, "Combined" is mapped to "indeterminate" under the operational rationale that core regular-force members represent permanent, continuing positions.
+* **Flexibility Notice**: We openly acknowledge this is an analytical assumption driven by limited domain context. The transformation logic in `DataCleaningPipeline.normalize_tenure` is purposely decoupled. Should departmental stakeholders specify an alternative apportionment rule (e.g., allocating a fixed percentage to term or reporting as a dedicated statutory slice), this mapping can be altered with a single configuration adjustment without altering the underlying database schema.
 
 ---
 
 ## 3. Database Schema & Query Optimization
 
-The relational schema is implemented in `app/models.py` using SQLAlchemy 2.0.
+The relational data model is designed to support rapid multi-year time-series aggregations while preserving bilingual metadata.
 
-### 3.1 Schema Design
+### 3.1 Entity Relationship Diagram (ERD)
 
-* **`departments` (Dimension Table)**:
-  * `id` (Integer, Primary Key, Autoincrement)
-  * `long_name_en` (String, Indexed, Not Null)
-  * `long_name_fr` (String, Not Null)
-  * `short_name_en` / `short_name_fr` (String, Nullable acronyms)
-* **`quarterly_fte` (Fact Table)**:
-  * `id` (Integer, Primary Key)
-  * `dept_id` (Integer, Foreign Key $\rightarrow$ `departments.id`, On Delete Cascade)
-  * `year` (Integer, Not Null)
-  * `quarter` (Integer, Not Null)
-  * `indeterminate`, `term`, `casual`, `student`, `missing` (Float, Default 0.0)
+```mermaid
+erDiagram
+    DEPARTMENTS ||--o{ QUARTERLY_FTE : "has historical records"
+    
+    DEPARTMENTS {
+        int id PK "Autoincrement Primary Key"
+        string long_name_en "Indexed Canonical English Name"
+        string long_name_fr "Canonical French Name"
+        string short_name_en "English Acronym (e.g., ASC)"
+        string short_name_fr "French Acronym (e.g., NAC)"
+    }
 
-### 3.2 Performance & Compound Indexing
+    QUARTERLY_FTE {
+        int id PK "Autoincrement Primary Key"
+        int dept_id FK "References DEPARTMENTS(id) ON DELETE CASCADE"
+        int year "Calendar / Fiscal Year"
+        int quarter "Quarter (1 to 4)"
+        float indeterminate "Full-Time Equivalents"
+        float term "Full-Time Equivalents"
+        float casual "Full-Time Equivalents"
+        float student "Full-Time Equivalents"
+        float missing "Unclassified / Gap Equivalents"
+    }
+```
 
-To ensure low-latency analytical queries across multi-year historical series:
-* A compound index `idx_dept_year_quarter` is created on `quarterly_fte (dept_id, year, quarter)`.
-* This matches the predominant analytical query pattern: retrieving quarterly breakdowns filtered by department ID and specific fiscal/calendar years.
+### 3.2 Performance & Compound Indexing Strategy
+* **Compound Index (`idx_dept_year_quarter`)**: Analytical queries overwhelmingly filter on a specific organization across a range of fiscal years (`WHERE dept_id = :id AND year = :year`). A multi-column B-Tree index on `(dept_id, year, quarter)` in `app/models.py` enables index-only lookups, avoiding costly full table scans.
 
 ---
 
-## 4. Key Assumptions & Architectural Trade-offs
+## 4. Assessment Context: Architectural Trade-Offs
 
-| Decision | Selected Option | Alternative Considered | Rationale & Trade-off Evaluation |
+Given the scope of this take-home exercise, architectural choices were selected to maximize evaluator portability while maintaining enterprise upgrade paths:
+
+| Architectural Area | Prototype Choice | Enterprise Production Target | Engineering Rationale & Upgrade Path |
 | :--- | :--- | :--- | :--- |
-| **Storage Engine** | **SQLite (via SQLAlchemy)** | PostgreSQL | **Decision**: SQLite provides zero-dependency, self-contained portability for local evaluation and containerized distribution. <br>**Trade-off**: Lacks native concurrent write scaling. Because the service is analytical (read-heavy, batch ETL writes), SQLite handles high concurrent read loads efficiently. Switching to managed PostgreSQL requires only altering the `DATABASE_URL` connection string without modifying business models. |
-| **I/O Concurrency** | **Synchronous ORM + FastAPI Threadpool** | Fully Async (asyncpg / greenlet) | **Decision**: Standard synchronous ORM sessions execute in FastAPI's internal `anyio` worker threadpool. <br>**Trade-off**: Avoids the operational overhead and debugging complexity of async database drivers while easily delivering sub-15ms response times for analytical queries. |
-| **Matching Strategy** | **Algorithmic Heuristic (difflib) + DLQ** | Hardcoded Static Dict | **Decision**: Dynamic Levenshtein matching adapts to new data files automatically. <br>**Trade-off**: Slightly higher initial ingestion CPU cost, fully mitigated by resolution memoization (`match_cache`). |
+| **Storage Engine** | SQLite (via SQLAlchemy) | Managed PostgreSQL (Azure Flexible Server) | **Why for Assessment**: Zero-dependency local evaluation. The evaluator needs no local database server or external credentials.<br><br>**Production Path**: Because models are decoupled via SQLAlchemy ORM, switching to PostgreSQL requires updating only the `DATABASE_URL` environment variable. |
+| **Concurrency Model** | Synchronous ORM + FastAPI Worker Pool | Asynchronous ORM (`asyncpg` / `greenlet`) | **Why for Assessment**: Predictable execution, clean testing fixtures, and sub-15ms response times on typical analytical queries.<br><br>**Production Path**: Wrap sessions in `AsyncSession` for extreme high-throughput requirements. |
+| **Data Ingestion** | In-Process Pandas Pipeline | Distributed Celery / Azure Functions Event Grid | **Why for Assessment**: Synchronous, inspectable feedback during `import_data.py`.<br><br>**Production Path**: Decouple ingestion into event-driven serverless workers when handling multi-gigabyte continuous feeds. |
 
 ---
 
-## 5. Advising PBO Analysts & Workflow Integration
+## 5. Tailoring Delivery to PBO Analysts & Workflows
 
-To address the asset qualifications regarding analyst advisory and downstream adaptation:
+To bridge technical delivery with the daily realities of economic researchers and policy analysts:
 
-1. **Direct Integration with Analytical Toolchains**:
-   * PBO analysts primarily conduct econometric modeling in **R**, **Python (pandas)**, and **Excel/PowerBI**.
-   * The API provides predictable, machine-readable JSON schemas that map directly to tabular DataFrames (`pd.read_json` or `httr` in R).
-2. **Dynamic Field Projection**:
-   * The `GET /api/departments/{id}/fte?tenure=...` endpoint supports projection filtering. Analysts investigating casualization trends can query only casual numbers without processing unwanted categories, reducing network payload and client-side transformation effort.
-3. **Data Quality Transparency**:
-   * The presence of the `missing` category alongside DLQ quarantine audit logs ensures that analysts have full visibility into data gaps, preventing statistical skew in parliamentary cost estimations.
+* **Native Tabular Interoperability (R, Python, Excel)**: Endpoints return flat, standardized JSON arrays that parse effortlessly into analytical DataFrames via one-liners:
+  * **Python**:
+    ```python
+    df = pd.read_json("http://localhost:8000/api/departments/1/fte")
+    ```
+  * **R**:
+    ```r
+    library(httr)
+    res <- GET("http://localhost:8000/api/departments/1/fte")
+    df <- jsonlite::fromJSON(content(res, "text"))
+    ```
+* **Payload Optimization via Dynamic Field Projection**: Analysts exploring casual staffing trends can pass `?tenure=casual` to retrieve only that metric, cutting network overhead and avoiding repetitive client-side array reshaping.
+* **Data Integrity Transparency**: Instead of hiding unclassified records, they are surfaced in the explicit `missing` bucket, while low-confidence entities are preserved in `data_quarantine.csv`. Analysts retain full visibility into data confidence levels during costing models.
+
+---
+
+## 6. Enterprise Cloud Evolution: Protected B & Scalability Blueprint
+
+To demonstrate production readiness within the Government of Canada digital environment, the diagram below outlines how this prototype scales to a fully automated, Protected B cloud deployment:
+
+```mermaid
+flowchart TD
+    subgraph Edge & Security Perimeter
+        Client[External Analysts / Users] --> FrontDoor[Azure Front Door / WAF]
+        FrontDoor --> APIGW[API Gateway / Ingress Controller]
+    end
+
+    subgraph Private VNet - Compute Subnet
+        APIGW --> K8s[Azure Container Apps / AKS Auto-Scaling Cluster]
+        K8s --> Probes{K8s Probes /health/live & ready}
+    end
+
+    subgraph Private VNet - Data Subnet (No Public IP)
+        K8s -- "Zero-Credential Managed Identity (MI)" --> DB[(Azure Database for PostgreSQL)]
+        K8s -- "Private Link" --> KV[(Azure Key Vault)]
+    end
+
+    subgraph Automated DevOps & CD Pipeline
+        GitPush[Git Push Main] --> CI[GitHub Actions: Pytest & Lint]
+        CI --> CD[CD: Docker Build & Push to Azure ACR]
+        CD --> Rollout[Zero-Downtime Blue/Green Rolling Update]
+    end
+```
+
+### Key Enterprise Features:
+* **Zero-Downtime Continuous Deployment (CD)**: Builds container images, tags with Git SHA, pushes to private container registries (ACR), and executes blue/green rolling deployments.
+* **Auto-Scaling with KEDA**: Dynamically scales compute pods from 1 to 20 instances in response to peak budget cycle inquiry loads, scaling to zero off-hours to optimize cloud spend (FinOps).
+* **High Availability & Geographic Redundancy**: Multi-zone replication across Azure Canada Central and Canada East ensures continuity during parliamentary debate cycles.
