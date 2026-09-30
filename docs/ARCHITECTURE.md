@@ -137,28 +137,28 @@ To demonstrate production readiness within the Government of Canada digital envi
 ```mermaid
 flowchart TD
     %% Automated CI/CD Pipeline
-    subgraph DevOps ["🚀 Automated CI/CD Pipeline (GitHub Actions)"]
-        Git[Git Commit / Main] --> CI[CI: Pytest & Coverage 90%+]
-        CI --> CD[CD: Docker Build & Push to ACR]
+    subgraph DevOps ["Automated CI/CD Pipeline (GitHub Actions)"]
+        Git["Git Commit / Main"] --> CI["CI: Pytest & Coverage 90%+"]
+        CI --> CD["CD: Docker Build & Push to ACR"]
     end
 
     %% Edge Security & Ingress
-    subgraph Edge ["🛡️ Perimeter Defense & Traffic Ingress"]
-        Users[External Analysts / Users] --> WAF[Azure Front Door / WAF (Layer 7 Rules)]
-        WAF --> Ingress[API Gateway / Ingress Controller]
+    subgraph Edge ["Perimeter Defense & Traffic Ingress"]
+        Users["External Analysts / Users"] --> WAF["Azure Front Door / WAF (Layer 7 Rules)"]
+        WAF --> Ingress["API Gateway / Ingress Controller"]
     end
 
     %% Private Virtual Network
-    subgraph VNet ["🔒 Private Virtual Network (VNet)"]
+    subgraph VNet ["Private Virtual Network (VNet)"]
         subgraph ComputeSubnet ["Compute Subnet (Private Routing)"]
-            App[Azure Container Apps / AKS Cluster]
+            App["Azure Container Apps / AKS Cluster"]
             Probes["/health/live & /health/ready Probes"]
             App --- Probes
         end
 
         subgraph DataSubnet ["Data Subnet (No Public IP)"]
-            DB[(Azure Database for PostgreSQL)]
-            KV[(Azure Key Vault)]
+            DB[("Azure Database for PostgreSQL")]
+            KV[("Azure Key Vault")]
         end
     end
 
