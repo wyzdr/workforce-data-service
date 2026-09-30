@@ -145,8 +145,7 @@ flowchart TD
     Ingress -->|"Internal Traffic"| App
     App -->|"Secretless Auth (Managed Identity)"| DB
     App -->|"Private Link (Private Endpoints)"| KV
----
-
+```
 
 ### Key Enterprise Features:
 * **Zero-Downtime Continuous Deployment (CD)**: Builds container images, tags with Git SHA, pushes to private container registries (ACR), and executes blue/green rolling deployments.
