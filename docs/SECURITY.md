@@ -69,7 +69,7 @@ flowchart TD
     API["Azure Container Apps / AKS<br/>(Structured JSON Logs<br/>via stdout)"] --> Hub["Azure Event Hub /<br/>Log Analytics Workspace"]
     
     subgraph EnterpriseSIEM ["Centralized Security Monitoring & Compliance"]
-        SIEM["Enterprise SIEM (Sentinel / Splunk)<br/>- Real-time Threat Analytics<br/>- HTTP 4xx/5xx Anomaly<br/>  Detection<br/>- Immutable LAC Compliant<br/>  Retention"]
+        SIEM["Enterprise SIEM (Splunk)<br/>- Real-time Threat Analytics<br/>- HTTP 4xx/5xx Anomaly<br/>  Detection<br/>- Immutable LAC Compliant<br/>  Retention"]
     end
 
     Hub --> SIEM
