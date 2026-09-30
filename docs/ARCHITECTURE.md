@@ -113,9 +113,9 @@ The system architecture addresses the practical needs of adapting data delivery 
 
 ---
 
-## 6. Enterprise Cloud Evolution: Protected B & Scalability Blueprint
+## 6. Enterprise Cloud Evolution Roadmap: Protected B & Scalability Blueprint
 
-To demonstrate production readiness within the Government of Canada digital environment, the diagram below outlines how this prototype scales to a fully automated, Protected B cloud deployment:
+While this prototype is intentionally packaged for zero-dependency local evaluation, it is architected to scale toward a fully automated, Protected B cloud deployment. The diagram below illustrates the proposed production blueprint within the Government of Canada digital environment:
 
 ```mermaid
 flowchart TD

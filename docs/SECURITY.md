@@ -60,7 +60,7 @@ flowchart TD
 
 * **Immediate CI Enhancement**: Integrating open-source SAST (`bandit -r app/`) and vulnerability auditing (`pip-audit`) can be added directly to `.github/workflows/ci.yml` in under 10 lines of YAML.
 
-## 4. Enterprise Auditing & Centralized Telemetry
+## 4. Enterprise Auditing & Centralized Telemetry (Future Cloud Roadmap)
 
 For deployment within federal cloud environments (e.g., Azure Government Canada), runtime auditability and Protected B compliance are satisfied via centralized SIEM integration:
 
@@ -75,7 +75,7 @@ flowchart TD
     Hub --> SIEM
 ```
 
-### Key Architectural Controls:
+### Key Architectural Controls Recommended:
 
 1. **Secretless Authentication via Managed Identity (MI)**:
    * Eliminates stored connection strings. APIs authenticate directly to Azure PostgreSQL and Key Vault using ephemeral Entra ID (Azure AD) tokens.
