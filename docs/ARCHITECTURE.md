@@ -2,36 +2,20 @@
 
 This document provides a comprehensive technical overview of the **PBO Workforce Data Service**, covering the real-world ETL reconciliation challenges, database modeling, pragmatic technical trade-offs, and an enterprise cloud roadmap for downstream PBO analysts.
 
----
-
 ## 1. High-Level Architecture Overview
 
 The service transitions raw, inconsistent departmental spreadsheets into clean, standardized, and high-performance analytical REST interfaces:
 
-```text
-[ Raw Excel Datasets ] (data/data.xlsx)
-│
-▼
-[ ETL Ingestion & Reconciliation Engine ] ──► [ Dead-Letter Queue (DLQ) Audit ]
-  Tiered String Matching + Memoization Cache    (data_quarantine.csv)
-  Statutory Tenure Normalization
-│
-▼
-[ Relational Storage Layer ]
-  Local Prototype: SQLite (Zero External Dependencies)
-  Production Ready: PostgreSQL (SQLAlchemy ORM Decoupled)
-  Compound Indexing: (dept_id, year, quarter)
-│
-▼
-[ FastAPI High-Performance Application Layer ]
-  Liveness & Readiness Cluster Probes (/health/live, /health/ready)
-  Parameter Whitelisting & Dynamic Field Projection
-│
-▼
-[ PBO Analytical Consumers: R / Python / PowerBI / Excel Modeling Workflows ]
+```mermaid
+flowchart TD
+    Raw["📂 Raw Excel Datasets<br/>(data/data.xlsx)"] --> ETL["⚙️ ETL Reconciliation Engine<br/>(app/pipeline.py)"]
+    ETL -.->|"Low-confidence anomalies"| DLQ["📋 Dead-Letter Queue Audit<br/>(data_quarantine.csv)"]
+    ETL --> DB[("🗄️ Relational Storage Layer<br/>SQLite / PostgreSQL")]
+    DB <--> API["⚡ FastAPI Application Layer<br/>(app/main.py)"]
+    API --> Clients["👥 PBO Analytical Consumers<br/>(R / Python / Excel / BI)"]
+
 ```
 
----
 
 ## 2. Ingestion & Entity Resolution: Real-World Data Challenges
 
