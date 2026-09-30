@@ -7,9 +7,9 @@ and quarterly full-time equivalent (FTE) workforce analytics.
 
 from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import asc, text
-
 from app.database import get_db
 from app.models import Department, QuarterlyFte
 from app.schemas import (
@@ -25,6 +25,10 @@ app = FastAPI(
     version="1.0.0",
 )
 
+@app.get("/", include_in_schema=False)
+def root_redirect():
+    """Redirect incoming root traffic directly to interactive OpenAPI documentation."""
+    return RedirectResponse(url="/docs")
 
 @app.get("/health/live", tags=["Monitoring"])
 def liveness_probe():
