@@ -138,20 +138,21 @@ python -m pytest --cov=app tests/ -v
 
 To maintain high developer experience and engineering modularity, detailed architectural analysis, design decisions, and security evaluations are organized in dedicated documents:
 
-- 📐 **Architecture & Data Design** (`docs/ARCHITECTURE.md`):
-  - ETL Pipeline Architecture & Multi-tier Entity Resolution (`pipeline.py`).
-  - Relational schema design, normalization, and compound indexing strategies (`models.py`).
-  - Key architectural assumptions, trade-offs (SQLite vs. PostgreSQL, synchronous vs. asynchronous I/O).
-  - Advising Analysts and supporting downstream analytical workflows.
-- 🛡️ **Security Architecture & Threat Model** (`docs/SECURITY.md`):
-  - OWASP API Security risk prioritization and implemented mitigations.
-  - Container non-root execution and parameterization defenses.
-  - Enterprise Cloud Roadmap: Protected B compliance, Managed Identity (Entra ID), and Private Endpoints.
+* 📐 **[Architecture & Data Design](docs/ARCHITECTURE.md)**:
+  * ETL Pipeline Architecture & Multi-tier Entity Resolution (`pipeline.py`).
+  * Relational schema design, normalization, and compound indexing strategies (`models.py`).
+  * Key architectural assumptions, trade-offs (SQLite vs. PostgreSQL, synchronous vs. asynchronous I/O).
+  * Advising Analysts and supporting downstream analytical workflows.
+
+* 🛡️ **[Security Architecture & Threat Model](docs/SECURITY.md)**:
+  * OWASP API Security risk prioritization and implemented mitigations.
+  * Container non-root execution and parameterization defenses.
+  * Enterprise Cloud Roadmap: Protected B compliance, Managed Identity (Entra ID), and Private Endpoints.
 
 ---
 
-## AI Tool Usage Disclosure
+### AI Tool Usage Disclosure
 
-- **Tool Used**: Large Language Model assistants were utilized as an advisory peer-review tool.
-- **Scope**: Assisted in brainstorming fuzzy reconciliation edge cases, generating boilerplate pytest fixtures, drafting Markdown documentation structures, and validating bilingual naming fields.
-- **Accountability**: All architecture, database models, business logic, pipeline transformations, and implementation decisions were authored, critically reviewed, tested, and validated by the author who retains full responsibility for all committed code.
+* **Tool Used**: Large Language Model assistants were utilized as an advisory peer-review tool.
+* **Scope**: Assisted in brainstorming fuzzy reconciliation edge cases, generating boilerplate pytest fixtures, drafting Markdown documentation structures, and validating bilingual naming fields.
+* **Accountability**: All architecture, database models, business logic, pipeline transformations, and implementation decisions were authored, critically reviewed, tested, and validated by the author who retains full responsibility for all committed code.
