@@ -27,28 +27,26 @@ def test_readiness_probe():
 # ==============================================================================
 
 def test_get_departments_success():
-    """Verify retrieval of all public sector departments and schema contract."""
+    """Verify retrieval of all public sector departments and bilingual schema contract."""
     response = client.get("/api/departments")
     assert response.status_code == 200
     data = response.json()
     
-    # Assert collection payload structure
     assert "departments" in data
     assert isinstance(data["departments"], list)
     assert len(data["departments"]) > 0
     
-    # Validate bilingual schema contract against the first department record
-    first_dept = data["departments"][0]
-    assert "dept_id" in first_dept
-    assert "dept_long" in first_dept
-    assert "dept_short" in first_dept
-    assert isinstance(first_dept["dept_id"], int)
+    # Validate bilingual schema contract on a sample department record
+    sample_dept = data["departments"][0]
+    assert "dept_id" in sample_dept
+    assert "dept_long" in sample_dept
+    assert "dept_short" in sample_dept
+    assert isinstance(sample_dept["dept_id"], int)
     
-    # Validate bilingual nested objects
-    assert "en" in first_dept["dept_long"]
-    assert "fr" in first_dept["dept_long"]
-    assert "en" in first_dept["dept_short"]
-    assert "fr" in first_dept["dept_short"]
+    assert "en" in sample_dept["dept_long"]
+    assert "fr" in sample_dept["dept_long"]
+    assert "en" in sample_dept["dept_short"]
+    assert "fr" in sample_dept["dept_short"]
 
 # ==============================================================================
 # 3. Core Business & Metric Query Endpoints
@@ -56,17 +54,25 @@ def test_get_departments_success():
 
 def test_get_valid_department_fte():
     """Verify quarterly FTE metric retrieval for an existing department."""
-    # Dynamically fetch an existing department ID to prevent brittle hardcoded tests
+    # Dynamically retrieve an existing department ID to prevent brittle hardcoded tests
     dept_res = client.get("/api/departments")
-    first_dept_id = dept_res.json()["departments"][0]["dept_id"]
+    sample_dept_id = dept_res.json()["departments"][0]["dept_id"]
 
-    response = client.get(f"/api/departments/{first_dept_id}/fte")
+    response = client.get(f"/api/departments/{sample_dept_id}/fte")
     assert response.status_code == 200
     data = response.json()
 
-    # Validate response schema
-    assert "dept_id" in data or "department_id" in data
-    assert "records" in data or "fte_records" in data or isinstance(data, dict)
+    # Validate actual response contract containing fte_per_quarter array
+    assert "fte_per_quarter" in data
+    assert isinstance(data["fte_per_quarter"], list)
+    assert len(data["fte_per_quarter"]) > 0
+
+    # Validate metric record types
+    first_record = data["fte_per_quarter"][0]
+    assert "year" in first_record
+    assert "quarter" in first_record
+    assert isinstance(first_record["year"], int)
+    assert isinstance(first_record["quarter"], int)
 
 # ==============================================================================
 # 4. Edge Cases & Request Validation (Error Handling)
