@@ -73,6 +73,7 @@ flowchart TD
     end
 
     Hub --> SIEM
+```
 
 ### Key Architectural Controls:
 

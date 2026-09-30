@@ -145,6 +145,7 @@ flowchart TD
     Ingress -->|"Internal Traffic"| App
     App -->|"Secretless Auth (Managed Identity)"| DB
     App -->|"Private Link (Private Endpoints)"| KV
+---
 
 
 ### Key Enterprise Features:
