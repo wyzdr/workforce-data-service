@@ -14,7 +14,7 @@ A production-grade backend service built to ingest, reconcile, standardize, and 
 
 You can run this application either using **Docker** (recommended for zero-dependency isolation) or directly on your **Local Machine**.
 
-### Option A: Run with Docker (Recommended)
+### Option A: Run with Docker
 
 1. **Build the container image**:
    ```bash
