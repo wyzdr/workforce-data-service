@@ -73,10 +73,10 @@ The service strictly adheres to bilingual public sector schemas and federal repo
 
 | Method | Endpoint | Description | Implementation Reference |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/health/live` | Container Liveness probe for orchestration | `app.main.liveness_probe` |
-| `GET` | `/health/ready` | Readiness probe verifying DB connectivity | `app.main.readiness_probe` |
-| `GET` | `/api/departments` | List all departments with bilingual metadata | `app.main.get_departments` |
-| `GET` | `/api/departments/{id}/fte` | Department quarterly FTE breakdown (filters: `year`, `tenure`) | `app.main.get_department_fte` |
+| `GET` | `/health/live` | Container Liveness probe for orchestration | [`app.main.liveness_probe`](app/main.py) |
+| `GET` | `/health/ready` | Readiness probe verifying DB connectivity | [`app.main.readiness_probe`](app/main.py) |
+| `GET` | `/api/departments` | List all departments with bilingual metadata | [`app.main.get_departments`](app/main.py) |
+| `GET` | `/api/departments/{id}/fte` | Department quarterly FTE breakdown (filters: `year`, `tenure`) | [`app.main.get_department_fte`](app/main.py) |
 
 ### Sample Response: `GET /api/departments`
 
