@@ -41,7 +41,7 @@ jobs:
       # Vulnerability scanning (Supply Chain Audit)
       - name: Run Dependency Vulnerability Audit (pip-audit)
         run: |
-          pip-audit
+          pip-audit -r requirements.txt
 
       - name: Run ETL Pipeline verification
         run: |
