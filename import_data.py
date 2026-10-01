@@ -2,13 +2,14 @@
 Data ingestion and ETL pipeline orchestration script.
 
 Executes end-to-end data processing:
-1. Schema initialization and reset for the Star Schema architecture.
-2. Ingestion of the canonical Departments dimension table with deduplication.
+1. Schema initialization (safe create_all, non-destructive).
+2. Transactional ingestion of the canonical Departments dimension table.
 3. Multi-sheet ingestion (FPS, RCMP, CAF) with automated cleaning and entity reconciliation.
 4. Aggregation of monthly snapshots into quarterly arithmetic means.
 5. Batch loading of dimension and fact records into the relational database.
 """
 
+import argparse
 import os
 from typing import Dict, List
 import pandas as pd
@@ -17,12 +18,14 @@ from app.models import Department, QuarterlyFte
 from app.pipeline import DataCleaningPipeline
 
 
-def run_import(excel_path: str = "data.xlsx") -> None:
+def run_import(excel_path: str = "data.xlsx", reset_schema: bool = False) -> None:
     """
     Execute the end-to-end ETL workflow to populate the workforce database.
 
     Args:
         excel_path (str): Relative or absolute path to the source Excel workbook.
+        reset_schema (bool): If True, explicitly drops tables before re-creating.
+                             Strictly disabled by default for production safety.
 
     Raises:
         FileNotFoundError: If the source workbook cannot be located.
@@ -38,12 +41,21 @@ def run_import(excel_path: str = "data.xlsx") -> None:
                 f"Cannot find '{excel_path}'. Please ensure data.xlsx is in the root or data/ directory."
             )
 
-    print("--> [1/4] Connecting to database and creating schema...")
-    Base.metadata.drop_all(bind=engine)
+    print("--> [1/4] Connecting to database and verifying schema...")
+    if reset_schema:
+        print("    [Notice] Explicit schema reset requested. Dropping all tables...")
+        Base.metadata.drop_all(bind=engine)
+
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
 
     try:
+        # Clean data in one same transaction with rollback
+        deleted_facts = db.query(QuarterlyFte).delete()
+        deleted_depts = db.query(Department).delete()
+        if deleted_facts > 0 or deleted_depts > 0:
+            print(f"    [Clean] Flushed existing records ({deleted_facts} facts, {deleted_depts} depts) for fresh ingestion.")
+
         print(f"--> [2/4] Reading Excel workbook: {excel_path} ...")
         xls = pd.ExcelFile(excel_path)
 
@@ -87,9 +99,8 @@ def run_import(excel_path: str = "data.xlsx") -> None:
             dept_id_map[clean_en] = dept_id
 
         db.bulk_save_objects(departments_to_insert)
-        db.commit()
         print(
-            f"    [OK] Successfully loaded {len(departments_to_insert)} canonical departments."
+            f"    [OK] Prepared {len(departments_to_insert)} canonical departments."
         )
 
         # 2. Initialize automated cleaning pipeline using canonical names as ground truth
@@ -189,6 +200,7 @@ def run_import(excel_path: str = "data.xlsx") -> None:
             for _, r in pivoted.iterrows()
         ]
         db.bulk_save_objects(records)
+
         db.commit()
         print(
             "    [OK] All datasets (FPS + RCMP + CAF) processed and loaded into 'workforce.db'."
@@ -203,4 +215,12 @@ def run_import(excel_path: str = "data.xlsx") -> None:
 
 
 if __name__ == "__main__":
-    run_import()
+    parser = argparse.ArgumentParser(description="Run workforce ETL data pipeline.")
+    parser.add_argument("--path", default="data.xlsx", help="Path to data.xlsx source")
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Force drop and recreate database schema (destructive).",
+    )
+    args = parser.parse_args()
+    run_import(excel_path=args.path, reset_schema=args.reset)
