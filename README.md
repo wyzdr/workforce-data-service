@@ -12,26 +12,9 @@ A production-grade backend service built to ingest, reconcile, standardize, and 
 
 ## ⚡Quickstart
 
-You can run this application either using **Docker** (recommended for zero-dependency isolation) or directly on your **Local Machine**.
+You can run this application either directly on your **Local Machine** or using **Docker** (recommended for zero-dependency isolation).
 
-### Option A: Run with Docker
-
-1. **Build the container image**:
-   ```bash
-   docker build -t workforce-service .
-   ```
-
-2. **Run the container**:
-   ```bash
-   docker run --name pbo-workforce -p 8000:8000 workforce-service
-   ```
-
-3. **Verify running instance**:
-   Open your browser at [http://localhost:8000/docs](http://localhost:8000/docs) to access the interactive OpenAPI / Swagger UI.
-
----
-
-### Option B: Run Locally (Python 3.11+)
+### Option A: Run Locally (Python 3.11+)
 
 1. **Create and activate a virtual environment**:
 
@@ -63,6 +46,24 @@ You can run this application either using **Docker** (recommended for zero-depen
    ```
 
    Access the service at [http://localhost:8000/docs](http://localhost:8000/docs).
+
+---
+
+### Option B: Run with Docker
+
+1. **Build the container image**:
+   ```bash
+   docker build -t workforce-service .
+   ```
+
+2. **Run the container**:
+   ```bash
+   docker run --name pbo-workforce -p 8000:8000 workforce-service
+   ```
+
+3. **Verify running instance**:
+   Open your browser at [http://localhost:8000/docs](http://localhost:8000/docs) to access the interactive OpenAPI / Swagger UI.
+
 
 ---
 
