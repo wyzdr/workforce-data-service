@@ -130,8 +130,8 @@ python -m pytest --cov=app tests/ -v
 
 ### Test Suite Structure
 
-- `tests/test_api.py`: Validates HTTP status codes, bilingual contract payloads, query parameters (`year`, `tenure`), and input validation (e.g. `404` on missing entities, `422` on invalid parameter types).
-- `tests/test_pipeline.py`: Unit tests for text normalization, Levenshtein fuzzy matching, resolution memoization, statutory tenure category mapping, and Dead-Letter Queue (DLQ) quarantine exports.
+* [`tests/test_api.py`](tests/test_api.py): Validates HTTP status codes, bilingual contract payloads, query parameters (`year`, `tenure`), and input validation (e.g. `404` on missing entities, `422` on invalid parameter types).
+* [`tests/test_pipeline.py`](tests/test_pipeline.py): Unit tests for text normalization, Levenshtein fuzzy matching, resolution memoization, statutory tenure category mapping, and Dead-Letter Queue (DLQ) quarantine exports.
 
 ---
 
@@ -139,9 +139,9 @@ python -m pytest --cov=app tests/ -v
 
 To maintain high developer experience and engineering modularity, detailed architectural analysis, design decisions, and security evaluations are organized in dedicated documents:
 
-* 📐 **[Architecture & Data Design](docs/ARCHITECTURE.md)**:
-  * ETL Pipeline Architecture & Multi-tier Entity Resolution (`pipeline.py`).
-  * Relational schema design, normalization, and compound indexing strategies (`models.py`).
+* 📐 [Architecture & Data Design](docs/architecture.md):
+  * ETL Pipeline Architecture & Multi-tier Entity Resolution ([`app/pipeline.py`](app/pipeline.py)).
+  * Relational schema design, normalization, and compound indexing strategies ([`app/models.py`](app/models.py)).
   * Key architectural assumptions, trade-offs (SQLite vs. PostgreSQL, synchronous vs. asynchronous I/O).
   * Advising Analysts and supporting downstream analytical workflows.
 
