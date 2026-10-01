@@ -1,7 +1,6 @@
 # Workforce Data Service
 
 [![CI Quality Gate](https://github.com/wyzdr/workforce-data-service/actions/workflows/ci.yml/badge.svg)](https://github.com/wyzdr/workforce-data-service/actions/workflows/ci.yml)
-[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![Test Coverage](https://img.shields.io/badge/coverage-90%25%2B-brightgreen.svg)](tests/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com)
 [![Docker Ready](https://img.shields.io/badge/docker-ready-2496ED.svg?logo=docker)](Dockerfile)
@@ -73,10 +72,10 @@ The service strictly adheres to bilingual public sector schemas and federal repo
 
 | Method | Endpoint | Description | Implementation Reference |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/health/live` | Container Liveness probe for orchestration | [`app.main.liveness_probe`](app/main.py) |
-| `GET` | `/health/ready` | Readiness probe verifying DB connectivity | [`app.main.readiness_probe`](app/main.py) |
-| `GET` | `/api/departments` | List all departments with bilingual metadata | [`app.main.get_departments`](app/main.py) |
-| `GET` | `/api/departments/{id}/fte` | Department quarterly FTE breakdown (filters: `year`, `tenure`) | [`app.main.get_department_fte`](app/main.py) |
+| `GET` | `/health/live` | Container Liveness probe for orchestration | [`app.main.liveness_probe`](app/main.py#L33) |
+| `GET` | `/health/ready` | Readiness probe verifying DB connectivity | [`app.main.readiness_probe`](app/main.py#L43) |
+| `GET` | `/api/departments` | List all departments with bilingual metadata | [`app.main.get_departments`](app/main.py#L65) |
+| `GET` | `/api/departments/{id}/fte` | Department quarterly FTE breakdown (filters: `year`, `tenure`) | [`app.main.get_department_fte`](app/main.py#L94) |
 
 ### Sample Response: `GET /api/departments`
 
@@ -139,21 +138,21 @@ python -m pytest --cov=app tests/ -v
 
 To maintain high developer experience and engineering modularity, detailed architectural analysis, design decisions, and security evaluations are organized in dedicated documents:
 
-* 📐 [Architecture & Data Design](docs/ARCHITECTURE.md):
-  * ETL Pipeline Architecture & Multi-tier Entity Resolution ([`app/pipeline.py`](app/pipeline.py)).
-  * Relational schema design, normalization, and compound indexing strategies ([`app/models.py`](app/models.py)).
+* 📐 **[Architecture & Data Design](docs/ARCHITECTURE.md)**:
+  * ETL Pipeline Architecture & Multi-tier Entity Resolution ([`app/pipeline.py:DataCleaningPipeline`](app/pipeline.py#L16)).
+  * Relational schema design, normalization, and compound indexing strategies ([`app/models.py`](app/models.py#L65)).
   * Key architectural assumptions, trade-offs (SQLite vs. PostgreSQL, synchronous vs. asynchronous I/O).
   * Advising Analysts and supporting downstream analytical workflows.
 
 * 🛡️ **[Security Architecture & Threat Model](docs/SECURITY.md)**:
   * OWASP API Security risk prioritization and implemented mitigations.
   * Container non-root execution and parameterization defenses.
-  * Enterprise Cloud Roadmap: Protected B compliance, Managed Identity (Entra ID), and Private Endpoints.
+  * Enterprise Cloud Roadmap: Protected B compliance, Managed Identity (RBAC), and Private Endpoints.
 
 ---
 
 ### AI Tool Usage Disclosure
 
 * **Tool Used**: Large Language Model assistants were utilized as an advisory peer-review tool.
-* **Scope**: Assisted in brainstorming fuzzy reconciliation edge cases, generating boilerplate pytest fixtures, drafting Markdown documentation structures, and validating bilingual naming fields.
+* **Scope**: Assisted in brainstorming fuzzy reconciliation edge cases, generating boilerplates, drafting Markdown documentation structures, and validating bilingual naming fields.
 * **Accountability**: All architecture, database models, business logic, pipeline transformations, and implementation decisions were authored, critically reviewed, tested, and validated by the author who retains full responsibility for all committed code.

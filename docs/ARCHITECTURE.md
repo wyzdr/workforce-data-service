@@ -18,13 +18,13 @@ flowchart TD
 
 ## 2. Ingestion & Entity Resolution: Real-World Data Challenges
 
-External records seldom arrive clean. The data ingestion process (`import_data.py` and `app/pipeline.py`) addresses data inconsistencies across federal reporting bodies without relying on rigid, hardcoded dictionary aliases.
+External records seldom arrive clean. The data ingestion process ([`import_data.py`](../import_data.py) and [`app/pipeline.py`](../app/pipeline.py)) addresses data inconsistencies across federal reporting bodies without relying on rigid, hardcoded dictionary aliases.
 
 ### 2.1 Tackling Real Dirty Data in `data.xlsx`
 During source data exploration, our pipeline encountered and resolved several tangible data traps:
-* **Invisible Whitespace & Escaped Characters**: Department strings frequently contained trailing tabs, multiple contiguous spaces, and embedded line breaks (e.g., `"Department of Finance \n"` vs `"Department of Finance"`). Our pipeline applies text normalization (`DataCleaningPipeline.normalize_text`) before any matching.
+* **Invisible Whitespace & Escaped Characters**: Department strings frequently contained trailing tabs, multiple contiguous spaces, and embedded line breaks (e.g., `"Department of Finance \n"` vs `"Department of Finance"`). Our pipeline applies text normalization ([`DataCleaningPipeline.normalize_text`](../app/pipeline.py#L86)) before any matching.
 * **Bilingual Inconsistencies & Acronym Drifts**: Entities reported alternatively by their English name, French name, or operational acronyms (e.g., `"ASC"` vs `"Accessibility Standards Canada"` vs `"Normes d'accessibilité Canada"`). The pipeline dynamically builds a multi-key index from canonical metadata sheets.
-* **Typographical Variants**: Near-miss spelling differences are caught using Levenshtein distance heuristics (`difflib.get_close_matches` with an $0.85$ confidence cutoff), preventing dropped records without manual intervention.
+* **Typographical Variants**: Near-miss spelling differences are caught using Levenshtein distance heuristics ([`difflib.get_close_matches`](../app/pipeline.py#L99) with a 0.85 confidence cutoff), preventing dropped records without manual intervention.
 
 ### 2.2 Ingestion Engine Workflow
 
@@ -51,7 +51,7 @@ $$FTE_{Quarter} = \frac{1}{N} \sum_{m=1}^{N} FTE_{m}$$
 *(where $N$ is the number of reported monthly snapshots in that quarter).*
 
 #### 2. Methodological Equivalency: Active Headcount as FTE Capacity
-* **The Context**: While the core `Federal Public Service` dataset reports granular monthly Full-Time Equivalents (`fte`), the specialized defense and policing workbooks (`Canadian Armed Forces` and `Royal Canadian Mounted Police - Members`) report active personnel exclusively as `headcount`. Neither sub-dataset provides hourly pro-rating or part-time breakdown ratios.
+* **Context**: While the core `Federal Public Service` dataset reports granular monthly Full-Time Equivalents (`fte`), the specialized defense and policing workbooks (`Canadian Armed Forces` and `Royal Canadian Mounted Police - Members`) report active personnel exclusively as `headcount`. Neither sub-dataset provides hourly pro-rating or part-time breakdown ratios.
 * **Assumption**: For regular military personnel and sworn police members, active headcount is mapped 1:1 to FTE analytical capacity (`headcount` $\rightarrow$ `fte`). 
 
 #### 3. Scope-Restricted Assumption: "Combined" Tenure for Sworn Members & Defense
