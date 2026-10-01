@@ -93,7 +93,7 @@ erDiagram
 ```
 
 ### 3.2 Performance & Compound Indexing Strategy
-* **Compound Index (`idx_dept_year_quarter`)**: Analytical queries overwhelmingly filter on a specific organization across a range of fiscal years (`WHERE dept_id = :id AND year = :year`). A multi-column B-Tree index on `(dept_id, year, quarter)` in ([`app/models.py`](app/models.py#L65)) enables index-only lookups, avoiding costly full table scans.
+* **Compound Index (`idx_dept_year_quarter`)**: Analytical queries overwhelmingly filter on a specific organization across a range of fiscal years (`WHERE dept_id = :id AND year = :year`). A multi-column B-Tree index on `(dept_id, year, quarter)` in ([`app/models.py`](../app/models.py#L65)) enables index-only lookups, avoiding costly full table scans.
 
 ---
 
