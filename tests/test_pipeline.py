@@ -5,13 +5,16 @@ from app.pipeline import DataCleaningPipeline
 
 @pytest.fixture
 def sample_pipeline():
-    """Initialize a pipeline instance with canonical government departments."""
-    canonical_depts = [
-        "Department of Finance",
-        "Treasury Board of Canada Secretariat",
-        "Accessibility Standards Canada",
-    ]
-    return DataCleaningPipeline(canonical_departments=canonical_depts, similarity_cutoff=0.8)
+    """Initialize a pipeline instance with bilingual aliases and acronyms."""
+    canonical_dict = {
+        "Department of Finance": "Department of Finance",
+        "Ministère des Finances": "Department of Finance",
+        "FIN": "Department of Finance",
+        "Accessibility Standards Canada": "Accessibility Standards Canada",
+        "Normes d'accessibilité Canada": "Accessibility Standards Canada",
+        "ASC": "Accessibility Standards Canada",
+    }
+    return DataCleaningPipeline(canonical_departments=canonical_dict, similarity_cutoff=0.8)
 
 
 # ==============================================================================
@@ -31,13 +34,22 @@ def test_normalize_text_none_and_nan():
 
 
 # ==============================================================================
-# 2. Entity Resolution & Fuzzy Matching Tests
+# 2. Entity Resolution & Bilingual Alias Tests
 # ==============================================================================
 
 def test_resolve_exact_match(sample_pipeline):
     """Verify Tier 1 exact resolution matches canonical entity directly."""
     result = sample_pipeline.resolve_department("Department of Finance")
     assert result == "Department of Finance"
+
+
+def test_resolve_bilingual_and_acronym_aliases(sample_pipeline):
+    """Verify resolution of French names and acronyms to canonical English entity."""
+    # French entity name
+    assert sample_pipeline.resolve_department("Normes d'accessibilité Canada") == "Accessibility Standards Canada"
+    # Acronym
+    assert sample_pipeline.resolve_department("ASC") == "Accessibility Standards Canada"
+    assert sample_pipeline.resolve_department("FIN") == "Department of Finance"
 
 
 def test_resolve_fuzzy_match_and_memoization(sample_pipeline):
@@ -59,10 +71,7 @@ def test_resolve_unmatched_and_dead_letter_queue(sample_pipeline):
     unknown_dept = "Unknown Ghost Agency 999"
     result = sample_pipeline.resolve_department(unknown_dept)
 
-    # Resolution should safely yield None
     assert result is None
-
-    # DLQ quarantine records must track the anomaly
     assert len(sample_pipeline.quarantine_records) == 1
     quarantined = sample_pipeline.quarantine_records[0]
     assert quarantined["field"] == "department"
@@ -101,9 +110,23 @@ def test_normalize_tenure_categories(raw_input, expected):
 # 4. Audit & Quarantine Reporting Tests
 # ==============================================================================
 
+def test_quarantine_unconverted_metric(sample_pipeline):
+    """Verify non-combined headcount records are properly enqueued in DLQ."""
+    sample_pipeline.quarantine_unconverted_metric(
+        sheet_name="TestSheet",
+        department="Department of Finance",
+        tenure="casual",
+        headcount=15.0,
+    )
+    assert len(sample_pipeline.quarantine_records) == 1
+    record = sample_pipeline.quarantine_records[0]
+    assert record["field"] == "headcount_unconverted"
+    assert "headcount=15.0" in record["raw_value"]
+    assert "casual" in record["raw_value"]
+
+
 def test_export_quarantine_report(sample_pipeline, tmp_path):
     """Verify DLQ audit trail CSV export capability."""
-    # Populate quarantine records
     sample_pipeline.resolve_department("Fictional Ministry of Magic")
     
     export_file = tmp_path / "test_quarantine.csv"
