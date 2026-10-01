@@ -7,9 +7,11 @@ Provides resilient ETL preprocessing mechanisms:
 3. Dead-Letter Queue (DLQ) quarantine tracking for low-confidence or unmapped records.
 4. Domain-driven tenure category normalization conforming to PBO API data contracts.
 """
+
 import difflib
+import os
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 import pandas as pd
 
 
@@ -18,7 +20,7 @@ class DataCleaningPipeline:
     Automated data cleaning and entity resolution pipeline.
 
     Attributes:
-        canonical_map (Dict[str, str]): Normalized key to canonical name mapping.
+        canonical_map (Dict[str, str]): Normalized search key to canonical name mapping.
         canonical_keys (List[str]): List of normalized canonical keys used for similarity search.
         cutoff (float): Minimum similarity ratio required to accept a fuzzy match.
         match_cache (Dict[str, Optional[str]]): Memoization table caching previous resolutions.
@@ -27,21 +29,33 @@ class DataCleaningPipeline:
 
     def __init__(
         self,
-        canonical_departments: List[str],
+        canonical_departments: Union[List[str], Dict[str, str]],
         similarity_cutoff: float = 0.85,
     ) -> None:
         """
         Initialize the cleaning pipeline with ground-truth department references.
 
         Args:
-            canonical_departments (List[str]): List of valid department names from dimension table.
+            canonical_departments (Union[List[str], Dict[str, str]]): 
+                Either a list of canonical names, or a dictionary mapping aliases
+                (e.g., French names, acronyms) directly to the canonical English entity name.
             similarity_cutoff (float): Fuzzy matching threshold between 0.0 and 1.0 (default 0.85).
         """
-        self.canonical_map = {
-            self.normalize_text(name): name for name in canonical_departments
-        }
-        self.canonical_keys = list(self.canonical_map.keys())
         self.cutoff = similarity_cutoff
+        self.canonical_map: Dict[str, str] = {}
+
+        if isinstance(canonical_departments, dict):
+            for alias, canonical_name in canonical_departments.items():
+                norm_alias = self.normalize_text(alias)
+                if norm_alias:
+                    self.canonical_map[norm_alias] = canonical_name
+        else:
+            for name in canonical_departments:
+                norm_name = self.normalize_text(name)
+                if norm_name:
+                    self.canonical_map[norm_name] = name
+
+        self.canonical_keys = list(self.canonical_map.keys())
 
         # In-memory resolution cache preventing redundant Levenshtein distance calculations
         self.match_cache: Dict[str, Optional[str]] = {}
@@ -72,7 +86,7 @@ class DataCleaningPipeline:
         Resolve an incoming organization string against canonical department entities.
 
         Resolution Strategy:
-        1. Exact Match: Immediate lookup against canonical key set.
+        1. Exact Match: Immediate lookup against canonical key set (supports aliases).
         2. Cache Lookup: Check memoized resolutions for repetitive dirty inputs.
         3. Fuzzy Match: Compute token similarity using difflib with threshold cutoff.
         4. Quarantine (DLQ): Log unresolved anomalies for auditor review and return None.
@@ -87,11 +101,11 @@ class DataCleaningPipeline:
         if not norm_name:
             return None
 
-        # Tier 1: Exact match
+        # Tier 1: Exact match against normalized alias/name dictionary
         if norm_name in self.canonical_map:
             return self.canonical_map[norm_name]
 
-        # Tier 2: Cache lookup
+        # Tier 2: Cache lookup (covers previously resolved matches or previous failures)
         if norm_name in self.match_cache:
             return self.match_cache[norm_name]
 
@@ -116,6 +130,37 @@ class DataCleaningPipeline:
             }
         )
         return None
+
+    def quarantine_unconverted_metric(
+        self,
+        sheet_name: str,
+        department: str,
+        tenure: str,
+        headcount: float,
+    ) -> None:
+        """
+        Log unconverted headcount records to the Dead-Letter Queue.
+
+        Enforces public sector accounting discipline: non-permanent headcounts
+        (term, casual, student) cannot be converted 1:1 to FTE without statutory ratios.
+
+        Args:
+            sheet_name (str): Originating Excel worksheet.
+            department (str): Raw department name.
+            tenure (str): Unconverted tenure category.
+            headcount (float): Non-zero headcount value blocked from FTE mapping.
+        """
+        self.quarantine_records.append(
+            {
+                "field": "headcount_unconverted",
+                "raw_value": f"headcount={headcount}, tenure={tenure}",
+                "normalized_value": self.normalize_text(department),
+                "reason": (
+                    f"Sheet '{sheet_name}': Non-combined headcount cannot be mapped "
+                    "to FTE without statutory conversion ratio"
+                ),
+            }
+        )
 
     @staticmethod
     def normalize_tenure(tenure: Any) -> str:
@@ -149,6 +194,7 @@ class DataCleaningPipeline:
     ) -> None:
         """
         Export quarantined dead-letter records to CSV for human-in-the-loop review.
+        If no quarantine records exist, remove legacy quarantine file if present.
 
         Args:
             filepath (str): Destination file path for quarantine audit log.
@@ -157,11 +203,14 @@ class DataCleaningPipeline:
             df = pd.DataFrame(self.quarantine_records).drop_duplicates()
             df.to_csv(filepath, index=False, encoding="utf-8-sig")
             print(
-                f"    [Quarantine Alert] {len(df)} unmatched records preserved in '{filepath}' for audit review."
+                f"    [Quarantine Alert] {len(df)} unmatched or unconverted records preserved in '{filepath}' for audit review."
             )
         else:
+            if os.path.exists(filepath):
+                try:
+                    os.remove(filepath)
+                except OSError:
+                    pass
             print(
                 "    [Pipeline Clean] 100% records successfully matched against canonical dimension."
             )
-
-       

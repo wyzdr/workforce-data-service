@@ -3,8 +3,8 @@ Data ingestion and ETL pipeline orchestration script.
 
 Executes end-to-end data processing:
 1. Schema initialization (safe create_all, non-destructive).
-2. Transactional ingestion of the canonical Departments dimension table.
-3. Multi-sheet ingestion (FPS, RCMP, CAF) with automated cleaning and entity reconciliation.
+2. Transactional ingestion of the canonical Departments dimension table with fallback.
+3. Multi-sheet dynamic ingestion with automated cleaning and bilingual entity reconciliation.
 4. Aggregation of monthly snapshots into quarterly arithmetic means.
 5. Batch loading of dimension and fact records into the relational database.
 """
@@ -50,7 +50,7 @@ def run_import(excel_path: str = "data.xlsx", reset_schema: bool = False) -> Non
     db = SessionLocal()
 
     try:
-        # Clean data in one same transaction with rollback
+        # Atomic clean in one transaction with rollback protection
         deleted_facts = db.query(QuarterlyFte).delete()
         deleted_depts = db.query(Department).delete()
         if deleted_facts > 0 or deleted_depts > 0:
@@ -61,76 +61,144 @@ def run_import(excel_path: str = "data.xlsx", reset_schema: bool = False) -> Non
 
         # 1. Ingest and deduplicate canonical Departments dimension
         dept_sheet = pd.read_excel(xls, sheet_name="Departments")
-        dept_sheet["clean_long_name_en"] = dept_sheet["long_name_en"].apply(
-            DataCleaningPipeline.normalize_text
+
+        # Fallback hierarchy: prioritize long_name_en; fallback to French name or acronym to prevent empty deduplication
+        dept_sheet["clean_long_name_en"] = (
+            dept_sheet["long_name_en"]
+            .fillna(dept_sheet.get("long_name_fr", pd.Series(dtype=object)))
+            .fillna(dept_sheet.get("short_name_en", pd.Series(dtype=object)))
+            .apply(DataCleaningPipeline.normalize_text)
         )
 
-        # Eliminate dimension duplicate rows (e.g., duplicated CFIA entries in source data)
+        # Remove completely blank rows
+        dept_sheet = dept_sheet[dept_sheet["clean_long_name_en"] != ""].copy()
+
+        # Deduplicate dimension rows based on normalized canonical identifier
         dept_sheet = dept_sheet.drop_duplicates(
             subset=["clean_long_name_en"], keep="first"
         ).reset_index(drop=True)
 
         departments_to_insert: List[Department] = []
         dept_id_map: Dict[str, int] = {}
+        alias_map: Dict[str, str] = {}
 
         for idx, row in dept_sheet.iterrows():
             clean_en = row["clean_long_name_en"]
             dept_id = idx + 1
+
+            name_fr = (
+                str(row["long_name_fr"]).strip()
+                if pd.notna(row.get("long_name_fr")) and str(row["long_name_fr"]).strip()
+                else clean_en
+            )
+            short_en = (
+                str(row["short_name_en"]).strip()
+                if pd.notna(row.get("short_name_en")) and str(row["short_name_en"]).strip()
+                else None
+            )
+            short_fr = (
+                str(row["short_name_fr"]).strip()
+                if pd.notna(row.get("short_name_fr")) and str(row["short_name_fr"]).strip()
+                else None
+            )
+
             dept_obj = Department(
                 id=dept_id,
                 long_name_en=clean_en,
-                long_name_fr=(
-                    str(row["long_name_fr"]).strip()
-                    if pd.notna(row["long_name_fr"])
-                    else clean_en
-                ),
-                short_name_en=(
-                    str(row["short_name_en"]).strip()
-                    if pd.notna(row["short_name_en"])
-                    else None
-                ),
-                short_name_fr=(
-                    str(row["short_name_fr"]).strip()
-                    if pd.notna(row["short_name_fr"])
-                    else None
-                ),
+                long_name_fr=name_fr,
+                short_name_en=short_en,
+                short_name_fr=short_fr,
             )
             departments_to_insert.append(dept_obj)
             dept_id_map[clean_en] = dept_id
 
+            # Register bilingual names and official acronyms to resolve to clean canonical key
+            alias_map[clean_en] = clean_en
+            if name_fr:
+                alias_map[name_fr] = clean_en
+            if short_en:
+                alias_map[short_en] = clean_en
+            if short_fr:
+                alias_map[short_fr] = clean_en
+
         db.bulk_save_objects(departments_to_insert)
         print(
-            f"    [OK] Prepared {len(departments_to_insert)} canonical departments."
+            f"    [OK] Prepared {len(departments_to_insert)} canonical departments ({len(alias_map)} bilingual alias entries indexed)."
         )
 
-        # 2. Initialize automated cleaning pipeline using canonical names as ground truth
+        # 2. Initialize cleaning pipeline with comprehensive alias registry
         pipeline = DataCleaningPipeline(
-            canonical_departments=list(dept_id_map.keys()),
+            canonical_departments=alias_map,
             similarity_cutoff=0.85,
         )
 
-        # 3. Read and unify workforce facts across FPS, RCMP, and CAF sheets
-        print(
-            "--> [3/4] Ingesting and unifying FPS, RCMP, and CAF fact sheets..."
-        )
-        fps_sheet = pd.read_excel(xls, sheet_name="Federal Public Service")
-        fps_sheet["fte"] = (
-            pd.to_numeric(fps_sheet["fte"], errors="coerce").fillna(0.0)
-        )
-        frames = [fps_sheet[["date", "tenure", "department", "fte"]]]
+        # 3. Dynamic fact sheet discovery and ingestion adhering to accounting discipline
+        print("--> [3/4] Scanning and ingesting fact sheets dynamically...")
+        DIMENSION_SHEETS = {"departments"}
+        REQUIRED_DIMS = ["date", "tenure", "department"]
+        frames: List[pd.DataFrame] = []
 
-        # Incorporate RCMP and CAF workbooks (mapping active headcount 1:1 to FTE capacity)
-        for sheet_name in ["RCMP", "CAF"]:
-            if sheet_name in xls.sheet_names:
-                extra_df = pd.read_excel(xls, sheet_name=sheet_name)
-                extra_df["fte"] = (
-                    pd.to_numeric(extra_df["headcount"], errors="coerce").fillna(0.0)
-                )
-                frames.append(extra_df[["date", "tenure", "department", "fte"]])
+        for sheet_name in xls.sheet_names:
+            if sheet_name.strip().lower() in DIMENSION_SHEETS:
+                continue
+
+            df = pd.read_excel(xls, sheet_name=sheet_name)
+            df.columns = [str(c).strip().lower() for c in df.columns]
+
+            missing_dims = [col for col in REQUIRED_DIMS if col not in df.columns]
+            if missing_dims:
+                print(f"    [Warning] Skipping sheet '{sheet_name}': missing required dimensions {missing_dims}.")
+                continue
+
+            # Metric extraction branch
+            if "fte" in df.columns:
+                sub_df = df[REQUIRED_DIMS + ["fte"]].copy()
+                sub_df["fte"] = pd.to_numeric(sub_df["fte"], errors="coerce").fillna(0.0)
+                metric_desc = "'fte'"
+
+            elif "headcount" in df.columns:
+                sub_df = df[REQUIRED_DIMS + ["headcount"]].copy()
+                sub_df["headcount"] = pd.to_numeric(sub_df["headcount"], errors="coerce").fillna(0.0)
+
+                # Restrict 1:1 headcount-to-FTE conversion strictly to regular military/police 'combined' status
+                norm_tenure = sub_df["tenure"].astype(str).str.strip().str.lower()
+                is_combined = norm_tenure == "combined"
+
+                sub_df["fte"] = 0.0
+                sub_df.loc[is_combined, "fte"] = sub_df.loc[is_combined, "headcount"]
+
+                # Audit quarantine: capture non-combined headcount to prevent unverified FTE inflation
+                unconverted_mask = (~is_combined) & (sub_df["headcount"] > 0)
+                if unconverted_mask.any():
+                    unconverted_rows = sub_df[unconverted_mask]
+                    for _, bad_row in unconverted_rows.iterrows():
+                        pipeline.quarantine_unconverted_metric(
+                            sheet_name=sheet_name,
+                            department=str(bad_row["department"]),
+                            tenure=str(bad_row["tenure"]),
+                            headcount=float(bad_row["headcount"]),
+                        )
+                    print(
+                        f"    [Quarantine Enqueued] Sheet '{sheet_name}': {len(unconverted_rows)} records with "
+                        f"non-combined headcount quarantined to prevent unverified FTE inflation."
+                    )
+
+                sub_df = sub_df.drop(columns=["headcount"])
+                metric_desc = "'headcount' (restricted to 'combined' tenure only)"
+
+            else:
+                print(f"    [Warning] Skipping sheet '{sheet_name}': neither 'fte' nor 'headcount' detected.")
+                continue
+
+            frames.append(sub_df)
+            print(f"    [Ingested] Sheet '{sheet_name}' processed via metric {metric_desc}.")
+
+        if not frames:
+            raise ValueError("No valid fact sheets found in the provided Excel workbook.")
 
         unified_facts = pd.concat(frames, ignore_index=True)
 
-        # Execute cleaning pipeline: fuzzy entity matching and tenure normalization
+        # Execute cleaning pipeline: fuzzy entity reconciliation and tenure normalization
         unified_facts["clean_dept"] = unified_facts["department"].apply(
             pipeline.resolve_department
         )
@@ -138,10 +206,10 @@ def run_import(excel_path: str = "data.xlsx", reset_schema: bool = False) -> Non
             pipeline.normalize_tenure
         )
 
-        # Export dead-letter audit log if anomalies exist
+        # Export Dead-Letter Queue quarantine log for audit review
         pipeline.export_quarantine_report("data_quarantine.csv")
 
-        # Associate fact records with surrogate dimension foreign keys
+        # Link surrogate foreign keys from canonical dimension table
         unified_facts["dept_id"] = unified_facts["clean_dept"].map(dept_id_map)
         valid_facts = unified_facts.dropna(subset=["dept_id"]).copy()
         valid_facts["dept_id"] = valid_facts["dept_id"].astype(int)
@@ -203,7 +271,7 @@ def run_import(excel_path: str = "data.xlsx", reset_schema: bool = False) -> Non
 
         db.commit()
         print(
-            "    [OK] All datasets (FPS + RCMP + CAF) processed and loaded into 'workforce.db'."
+            f"    [OK] Successfully ingested {len(frames)} fact sheets into 'workforce.db'."
         )
 
     except Exception as exc:
