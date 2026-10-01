@@ -1,3 +1,8 @@
+"""
+Unit tests for data cleaning, normalization, and entity reconciliation pipeline.
+Covers real-world whitespace defects, bilingual aliases, and DLQ quarantine flows.
+"""
+
 import os
 import pytest
 from app.pipeline import DataCleaningPipeline
@@ -5,7 +10,7 @@ from app.pipeline import DataCleaningPipeline
 
 @pytest.fixture
 def sample_pipeline():
-    """Initialize a pipeline instance with bilingual aliases and acronyms."""
+    """Initialize a pipeline instance with bilingual aliases, acronyms, and real-world entities."""
     canonical_dict = {
         "Department of Finance": "Department of Finance",
         "Ministère des Finances": "Department of Finance",
@@ -13,6 +18,15 @@ def sample_pipeline():
         "Accessibility Standards Canada": "Accessibility Standards Canada",
         "Normes d'accessibilité Canada": "Accessibility Standards Canada",
         "ASC": "Accessibility Standards Canada",
+        # Real-world target departments from dataset
+        "Public Service Commission of Canada": "Public Service Commission of Canada",
+        "Commission de la fonction publique du Canada": "Public Service Commission of Canada",
+        "PSC": "Public Service Commission of Canada",
+        "Office of the Commissioner for Federal Judicial Affairs Canada": "Office of the Commissioner for Federal Judicial Affairs Canada",
+        "FJA": "Office of the Commissioner for Federal Judicial Affairs Canada",
+        "Canadian Food Inspection Agency": "Canadian Food Inspection Agency",
+        "Agence canadienne d’inspection des aliments": "Canadian Food Inspection Agency",
+        "CFIA": "Canadian Food Inspection Agency",
     }
     return DataCleaningPipeline(canonical_departments=canonical_dict, similarity_cutoff=0.8)
 
@@ -34,7 +48,7 @@ def test_normalize_text_none_and_nan():
 
 
 # ==============================================================================
-# 2. Entity Resolution & Bilingual Alias Tests
+# 2. Entity Resolution & Real-world Anomaly Tests
 # ==============================================================================
 
 def test_resolve_exact_match(sample_pipeline):
@@ -50,6 +64,25 @@ def test_resolve_bilingual_and_acronym_aliases(sample_pipeline):
     # Acronym
     assert sample_pipeline.resolve_department("ASC") == "Accessibility Standards Canada"
     assert sample_pipeline.resolve_department("FIN") == "Department of Finance"
+
+
+def test_resolve_real_world_whitespace_anomalies(sample_pipeline):
+    """
+    Verify reconciliation of known defects from source dataset:
+    1. 'Public Service  Commission of Canada' -> internal double whitespace
+    2. ' Office of the Commissioner for Federal Judicial Affairs Canada' -> leading space
+    """
+    dirty_psc = "Public Service  Commission of Canada"
+    assert sample_pipeline.resolve_department(dirty_psc) == "Public Service Commission of Canada"
+
+    dirty_fja = " Office of the Commissioner for Federal Judicial Affairs Canada"
+    assert sample_pipeline.resolve_department(dirty_fja) == "Office of the Commissioner for Federal Judicial Affairs Canada"
+
+
+def test_resolve_cfia_acronym_and_bilingual(sample_pipeline):
+    """Verify CFIA resolves accurately via acronym and French name."""
+    assert sample_pipeline.resolve_department("CFIA") == "Canadian Food Inspection Agency"
+    assert sample_pipeline.resolve_department("Agence canadienne d’inspection des aliments") == "Canadian Food Inspection Agency"
 
 
 def test_resolve_fuzzy_match_and_memoization(sample_pipeline):
