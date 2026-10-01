@@ -119,7 +119,7 @@ The system architecture addresses the practical needs of adapting data delivery 
 * **Targeted Querying (Reducing Client Overhead)**:
   * Using optional parameters such as `?year=2021` and `?tenure=casual`, analysts can pull exact data slices directly into their costing models without needing to fetch and filter entire multi-year departmental series locally.
 * **Preserving Analytical Integrity & Transparency**:
-  * Public sector costing models require strict accountability. Instead of silently dropping malformed records or coercing unknown figures, the pipeline exposes unclassified FTEs via the explicit `missing` category and logs low-confidence matches to ([`data_quarantine.csv`](import_data.py#L142)). This ensures analysts have full visibility into data quality boundaries when preparing parliamentary estimates.
+  * Public sector costing models require strict accountability. Instead of silently dropping malformed records or coercing unknown figures, the pipeline exposes unclassified FTEs via the explicit `missing` category and logs low-confidence matches to ([`data_quarantine.csv`](../import_data.py#L142)). This ensures analysts have full visibility into data quality boundaries when preparing parliamentary estimates.
 * **Future Workflow Recommendations (Advisory)**:
   * **Direct Tabular Export**: For analysts working predominantly in Excel, extending the API to support `Accept: text/csv` would allow one-click Power Query refresh without JSON parsing.
   * **Scheduled Snapshot Feeds**: Generating pre-aggregated fiscal-year summary tables can accelerate recurring quarterly reports during intense parliamentary budget cycles.
