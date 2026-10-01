@@ -58,8 +58,6 @@ flowchart TD
     Container --> Promotion
 ```
 
-* **Immediate CI Enhancement**: Integrating open-source SAST (`bandit -r app/`) and vulnerability auditing (`pip-audit`) can be added directly to `.github/workflows/ci.yml` in under 10 lines of YAML.
-
 ## 4. Enterprise Auditing & Centralized Telemetry (Future Cloud Roadmap)
 
 For deployment within federal cloud environments (e.g., Azure), runtime auditability and Protected B compliance are satisfied via centralized SIEM integration:

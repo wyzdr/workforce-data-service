@@ -23,7 +23,7 @@ You can run this application either using **Docker** (recommended for zero-depen
 
 2. **Run the container**:
    ```bash
-   docker run -d --name pbo-workforce -p 8000:8000 workforce-service
+   docker run --name pbo-workforce -p 8000:8000 workforce-service
    ```
 
 3. **Verify running instance**:
@@ -49,7 +49,7 @@ You can run this application either using **Docker** (recommended for zero-depen
 
 2. **Install project dependencies**:
    ```bash
-   pip install -r requirements.txt
+   pip install -r requirements-dev.txt
    ```
 
 3. **Execute ETL pipeline (Ingest `data/data.xlsx` into database)**:
