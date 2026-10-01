@@ -139,7 +139,7 @@ python -m pytest --cov=app tests/ -v
 
 To maintain high developer experience and engineering modularity, detailed architectural analysis, design decisions, and security evaluations are organized in dedicated documents:
 
-* 📐 [Architecture & Data Design](docs/architecture.md):
+* 📐 [Architecture & Data Design](docs/ARCHITECTURE.md):
   * ETL Pipeline Architecture & Multi-tier Entity Resolution ([`app/pipeline.py`](app/pipeline.py)).
   * Relational schema design, normalization, and compound indexing strategies ([`app/models.py`](app/models.py)).
   * Key architectural assumptions, trade-offs (SQLite vs. PostgreSQL, synchronous vs. asynchronous I/O).

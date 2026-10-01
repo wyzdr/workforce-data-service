@@ -41,10 +41,23 @@ flowchart LR
     F --> I
 ```
 
-### 2.3 Business Assumption: Handling "Combined" Tenure
-* **The Context**: In federal workforce reporting, security and defense entities (e.g., RCMP, DND) occasionally report personnel counts under a blanket "Combined" category rather than granular breakdowns.
-* **Our Pragmatic Assumption**: In this prototype, "Combined" is mapped to "indeterminate" under the operational rationale that core regular-force members represent permanent, continuing positions.
-* **Flexibility Notice**: We openly acknowledge this is an analytical assumption driven by limited domain context. The transformation logic in `DataCleaningPipeline.normalize_tenure` is purposely decoupled. Should departmental stakeholders specify an alternative apportionment rule (e.g., allocating a fixed percentage to term or reporting as a dedicated statutory slice), this mapping can be altered with a single configuration adjustment without altering the underlying database schema.
+### 2.3 Key Analytical & Domain Assumptions
+
+#### 1. Quarterly Aggregation: Arithmetic Mean for Stock Capacity
+* **Assumption**: Because FTE represents a stock capacity metric rather than a cumulative flow metric, quarterly figures are computed as the **arithmetic mean** across monthly observations within that quarter:
+
+$$FTE_{Quarter} = \frac{1}{N} \sum_{m=1}^{N} FTE_{m}$$
+
+*(where $N$ is the number of reported monthly snapshots in that quarter).*
+
+#### 2. Methodological Equivalency: Active Headcount as FTE Capacity
+* **The Context**: While the core `Federal Public Service` dataset reports granular monthly Full-Time Equivalents (`fte`), the specialized defense and policing workbooks (`Canadian Armed Forces` and `Royal Canadian Mounted Police - Members`) report active personnel exclusively as `headcount`. Neither sub-dataset provides hourly pro-rating or part-time breakdown ratios.
+* **Assumption**: For regular military personnel and sworn police members, active headcount is mapped 1:1 to FTE analytical capacity (`headcount` $\rightarrow$ `fte`). 
+
+#### 3. Scope-Restricted Assumption: "Combined" Tenure for Sworn Members & Defense
+* **Clarified Scope**: This assumption applies **strictly to regular uniformed personnel**—namely `Royal Canadian Mounted Police - Members` and `Canadian Armed Forces (CAF)`. Standard civilian employees under `Royal Canadian Mounted Police` (Public Service Employees) maintain full statutory breakdowns (`indeterminate`, `term`, `casual`, `student`) and are processed without heuristic tenure mapping.
+* **Our Operational Rationale**: Uniformed members and regular armed forces are reported as a blanket `"Combined"` category in official sources. We map `"Combined"` to `"indeterminate"` under the operational rationale that core regular-force members represent permanent, continuous service commitments.
+* **Architecture Flexibility Notice**: We acknowledge this is an operational proxy driven by source-data limitations. The transformation logic within `DataCleaningPipeline.normalize_tenure` is intentionally decoupled from storage models. If analysts require a proportional apportionment rule (e.g., distributing a fixed percentage to `term` or maintaining a separate statutory slice), the mapping can be revised with a single configuration adjustment without altering the underlying 3NF database schema.
 
 ---
 
