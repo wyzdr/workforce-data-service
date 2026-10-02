@@ -22,9 +22,9 @@ External records seldom arrive clean. The data ingestion process ([`import_data.
 
 ### 2.1 Tackling Real Dirty Data in `data.xlsx`
 During source data exploration, our pipeline encountered and resolved several tangible data traps:
-* **Invisible Whitespace & Escaped Characters**: Department strings frequently contained trailing tabs, multiple contiguous spaces, and embedded line breaks (e.g., `"Department of Finance \n"` vs `"Department of Finance"`). Our pipeline applies text normalization ([`DataCleaningPipeline.normalize_text`](../app/pipeline.py#L86)) before any matching.
+* **Invisible Whitespace & Escaped Characters**: Department strings frequently contained trailing tabs, multiple contiguous spaces, and embedded line breaks (e.g., `"Department of Finance \n"` vs `"Department of Finance"`). Our pipeline applies text normalization ([`DataCleaningPipeline.normalize_text`](../app/pipeline.py#L71)) before any matching.
 * **Bilingual Inconsistencies & Acronym Drifts**: Entities reported alternatively by their English name, French name, or operational acronyms (e.g., `"ASC"` vs `"Accessibility Standards Canada"` vs `"Normes d'accessibilité Canada"`). The pipeline dynamically builds a multi-key index from canonical metadata sheets.
-* **Typographical Variants**: Near-miss spelling differences are caught using Levenshtein distance heuristics ([`difflib.get_close_matches`](../app/pipeline.py#L99) with a 0.85 confidence cutoff), preventing dropped records without manual intervention.
+* **Typographical Variants**: Near-miss spelling differences are caught using Levenshtein distance heuristics ([`difflib.get_close_matches`](../app/pipeline.py#L117) with a 0.85 confidence cutoff), preventing dropped records without manual intervention.
 
 ### 2.2 Ingestion Engine Workflow
 
@@ -119,7 +119,7 @@ The system architecture addresses the practical needs of adapting data delivery 
 * **Targeted Querying (Reducing Client Overhead)**:
   * Using optional parameters such as `?year=2021` and `?tenure=casual`, analysts can pull exact data slices directly into their costing models without needing to fetch and filter entire multi-year departmental series locally.
 * **Preserving Analytical Integrity & Transparency**:
-  * Public sector costing models require strict accountability. Instead of silently dropping malformed records or coercing unknown figures, the pipeline exposes unclassified FTEs via the explicit `missing` category and logs low-confidence matches to ([`data_quarantine.csv`](../import_data.py#L142)). This ensures analysts have full visibility into data quality boundaries when preparing parliamentary estimates.
+  * Public sector costing models require strict accountability. Instead of silently dropping malformed records or coercing unknown figures, the pipeline exposes unclassified FTEs via the explicit `missing` category and logs low-confidence matches to ([`data_quarantine.csv`](../import_data.py#L236)). This ensures analysts have full visibility into data quality boundaries when preparing parliamentary estimates.
 * **Future Workflow Recommendations (Advisory)**:
   * **Direct Tabular Export**: For analysts working predominantly in Excel, extending the API to support `Accept: text/csv` would allow one-click Power Query refresh without JSON parsing.
   * **Scheduled Snapshot Feeds**: Generating pre-aggregated fiscal-year summary tables can accelerate recurring quarterly reports during intense parliamentary budget cycles.

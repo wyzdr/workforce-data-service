@@ -10,10 +10,10 @@ Security risks were evaluated and prioritized based on vulnerability severity, e
 
 | Threat Vector | OWASP API Category | Initial Risk | Implemented Mitigation | Residual Risk | Implementation Evidence |
 | :--- | :--- | :---: | :--- | :---: | :--- |
-| **SQL Injection (SQLi)** | OWASP Top 10: Injection (API10:2023) | **HIGH** | **Strict Parameterization**: Queries use SQLAlchemy 2.0 ORM expressions. Raw SQL concatenation is entirely prohibited. | **LOW** | [`app/main.py:get_department_fte`](../app/main.py#L94) |
-| **Projection / Property Injection** | API3:2023 Broken Object Property Level Authorization | **MEDIUM** | **Strict Whitelist Verification**: The `tenure` parameter is checked against a static set (`{"indeterminate", "term", "casual", "student", "missing"}`). Invalid entries immediately abort with HTTP 400. | **LOW** | [`app/main.py:get_department_fte`](../app/main.py#L148) |
+| **SQL Injection (SQLi)** | OWASP Top 10: Injection (API10:2023) | **HIGH** | **Strict Parameterization**: Queries use SQLAlchemy 2.0 ORM expressions. Raw SQL concatenation is entirely prohibited. | **LOW** | [`app/main.py:get_department_fte`](../app/main.py#L140) |
+| **Projection / Property Injection** | API3:2023 Broken Object Property Level Authorization | **MEDIUM** | **Strict Whitelist Verification**: The `tenure` parameter is checked against a static set (`{"indeterminate", "term", "casual", "student", "missing"}`). Invalid entries immediately abort with HTTP 400. | **LOW** | [`app/main.py:get_department_fte`](../app/main.py#L193) |
 | **Container Privilege Escalation** | CWE-250 Unnecessary Privileges | **MEDIUM** | **Non-Root Execution**: Provisions and executes via a locked-down system user (`appuser`, UID 10001). | **LOW** | [`Dockerfile:USER appuser`](../Dockerfile#L14) |
-| **Resource Depletion / DoS** | API4:2023 Unrestricted Resource Consumption | **MEDIUM** | **Pydantic Type Boundaries**: Non-integer IDs or queries trigger instant 422 rejections at the gateway layer. Compound indices prevent table-scanning query attacks. | **LOW** | [`app/main.py:get_department_fte`](../app/main.py#L94-97) |
+| **Resource Depletion / DoS** | API4:2023 Unrestricted Resource Consumption | **MEDIUM** | **Pydantic Type Boundaries**: Non-integer IDs or queries trigger instant 422 rejections at the gateway layer. Compound indices prevent table-scanning query attacks. | **LOW** | [`app/main.py:get_department_fte`](../app/main.py#L140) |
 | **Supply Chain Vulnerability (CVE)** | API8:2023 Security Misconfiguration | **MEDIUM** | **Multi-Stage Minimal Runtime**: Build toolchains are discarded. Production runtime is based on stripped `python:3.11-slim`. | **LOW** | [`Dockerfile:FROM python:3.11-slim`](../Dockerfile#L10) |
 
 ---
@@ -24,7 +24,7 @@ Security risks were evaluated and prioritized based on vulnerability severity, e
 
 * **Strict Type Safety**: Query parameters are typed and parsed via Pydantic/FastAPI (`id: int`, `year: Optional[int]`). Any malformed input (e.g., passing string characters into `id`) fails at the gateway layer with HTTP 422 before reaching business logic.
 * **Zero Hardcoded Secrets**: No database passwords, private keys, or API tokens are checked into the repository. Configuration parameters are externalized through environment variables.
-* **Probes for Cluster Health**: Orchestration platforms (Kubernetes / Azure App Service) can continuously verify process liveness ([`/health/live`](../app/main.py#L33)) and database connectivity readiness ([`/health/ready`](../app/main.py#L43)) to prevent routing traffic to unhealthy instances.
+* **Probes for Cluster Health**: Orchestration platforms (Kubernetes / Azure App Service) can continuously verify process liveness ([`/health/live`](../app/main.py#L225)) and database connectivity readiness ([`/health/ready`](../app/main.py#L43)) to prevent routing traffic to unhealthy instances.
 
 ### 2.2 Container & Supply Chain Security
 

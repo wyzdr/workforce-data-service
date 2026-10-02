@@ -72,10 +72,10 @@ The service strictly adheres to bilingual public sector schemas and federal repo
 
 | Method | Endpoint | Description | Implementation Reference |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/health/live` | Container Liveness probe for orchestration | [`app.main.liveness_probe`](app/main.py#L33) |
-| `GET` | `/health/ready` | Readiness probe verifying DB connectivity | [`app.main.readiness_probe`](app/main.py#L43) |
-| `GET` | `/api/departments` | List all departments with bilingual metadata | [`app.main.get_departments`](app/main.py#L65) |
-| `GET` | `/api/departments/{id}/fte` | Department quarterly FTE breakdown (filters: `year`, `tenure`) | [`app.main.get_department_fte`](app/main.py#L94) |
+| `GET` | `/health/live` | Container Liveness probe for orchestration | [`app.main.liveness_probe`](app/main.py#L225) |
+| `GET` | `/health/ready` | Readiness probe verifying DB connectivity | [`app.main.readiness_probe`](app/main.py#L234) |
+| `GET` | `/api/departments` | List all departments with bilingual metadata | [`app.main.get_departments`](app/main.py#L107) |
+| `GET` | `/api/departments/{id}/fte` | Department quarterly FTE breakdown (filters: `year`, `tenure`) | [`app.main.get_department_fte`](app/main.py#L136) |
 
 ### Sample Response: `GET /api/departments`
 
@@ -139,7 +139,7 @@ python -m pytest --cov=app tests/ -v
 To maintain high developer experience and engineering modularity, detailed architectural analysis, design decisions, and security evaluations are organized in dedicated documents:
 
 * 📐 **[Architecture & Data Design](docs/ARCHITECTURE.md)**:
-  * ETL Pipeline Architecture & Multi-tier Entity Resolution ([`app/pipeline.py:DataCleaningPipeline`](app/pipeline.py#L16)).
+  * ETL Pipeline Architecture & Multi-tier Entity Resolution ([`app/pipeline.py:DataCleaningPipeline`](app/pipeline.py#L21)).
   * Relational schema design, normalization, and compound indexing strategies ([`app/models.py`](app/models.py#L65)).
   * Key architectural assumptions, trade-offs (SQLite vs. PostgreSQL, synchronous vs. asynchronous I/O).
   * Advising Analysts and supporting downstream analytical workflows.
@@ -149,7 +149,7 @@ To maintain high developer experience and engineering modularity, detailed archi
   * Container non-root execution and parameterization defenses.
   * Enterprise Cloud Roadmap: Protected B compliance, Managed Identity (RBAC), and Private Endpoints.
 
-* 📡 **[Cloud-native Logging & Incident Traceability](app/main.py#L28)**
+* 📡 **[Cloud-native Logging & Incident Traceability](app/main.py#L33)**
   * Dual-channel routing (`stdout` & local persistent logs)
   * Asynchronous HTTP telemetry & anomaly tracing (2xx/4xx/5xx)
   * Resilient ETL execution & Dead-Letter Queue (DLQ) audit trail
