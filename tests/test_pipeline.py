@@ -91,25 +91,25 @@ def test_resolve_cfia_acronym_and_bilingual(sample_pipeline):
 def test_resolve_fuzzy_match_and_memoization(sample_pipeline):
     """
     Verify Tier 3 fuzzy matching reconciles typos and verifies Tier 2 memoization cache.
-    Includes real-world raw typo 'Privy Council Officee'.
+    Covers trailing-character defects and the real-world anomaly 'Privy Council Officee'.
     """
-    # 1. Typo of 'Privy Council Officee'
+    # 1. First invocation: resolve typo via Tier 3 fuzzy matching (difflib)
+    typo_name = "Department of Financ"
+    resolved = sample_pipeline.resolve_department(typo_name)
+    assert resolved == "Department of Finance"
+
+    # Verify that the normalized, lowercase key is indexed in the memoization cache
+    assert typo_name.lower() in sample_pipeline.match_cache
+
+    # 2. Second invocation: verify Tier 2 memoization cache hit without re-running fuzzy match
+    cached_result = sample_pipeline.resolve_department(typo_name)
+    assert cached_result == "Department of Finance"
+
+    # 3. Real-world dataset anomaly: reconcile redundant character typo and verify cache indexing
     pco_typo = "Privy Council Officee"
     resolved_pco = sample_pipeline.resolve_department(pco_typo)
     assert resolved_pco == "Privy Council Office"
-    assert "privy council officee" in sample_pipeline.match_cache
-
-    # 2. Missing trailing letters
-    typo_name = "Department of Financ"  # Slight typo
-    
-    # First invocation: fuzzy matching via difflib
-    resolved = sample_pipeline.resolve_department(typo_name)
-    assert resolved == "Department of Finance"
-    assert typo_name in sample_pipeline.match_cache
-
-    # Second invocation: hits memoization cache
-    cached_result = sample_pipeline.resolve_department(typo_name)
-    assert cached_result == "Department of Finance"
+    assert pco_typo.lower() in sample_pipeline.match_cache
 
 
 def test_resolve_unmatched_and_dead_letter_queue(sample_pipeline):
