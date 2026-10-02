@@ -5,7 +5,12 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com)
 [![Docker Ready](https://img.shields.io/badge/docker-ready-2496ED.svg?logo=docker)](Dockerfile)
 
-A production-grade backend service built to ingest, reconcile, standardize, and serve federal workforce datasets.
+A cloud-native backend service built to ingest, reconcile, standardize, and serve federal workforce datasets.
+
+> 📋 **Case Study Deliverables & Quick Navigation**:
+> * 💡 **[Case Study Design Questions (Responses to Questions 1, 2 & 3)](DESIGN_QUESTIONS.md)**
+> * 📐 **[System Architecture & Ingestion Design](docs/ARCHITECTURE.md)**
+> * 🛡️ **[Security Architecture & Threat Model](docs/SECURITY.md)**
 
 ---
 
@@ -134,11 +139,24 @@ python -m pytest --cov=app tests/ -v
 
 ---
 
-## 📂 System Architecture & Deep Dive Documentation
+---
+
+## 📡 Cloud-native Logging & Incident Traceability
+
+* **Dual-Channel Logging**: Log events stream to standard output (`stdout`) for cloud/container log collectors (e.g., Azure Monitor, CloudWatch) while simultaneously writing persistent local audit records (`api_access.log`, `pipeline.log`).
+* **HTTP Telemetry & Anomaly Tracing**: Custom middleware captures request latency, client IP hashes, and categorizes HTTP response codes (2xx/4xx/5xx) for rapid root-cause analysis ([`app/main.py:AuditLoggingMiddleware`](app/main.py)).
+* **ETL Dead-Letter Queue (DLQ)**: Ingestion anomalies (unmatched organizations, unconverted headcount metrics) are quarantined into `data_quarantine.csv` with granular failure reasons, preserving an immutable audit trail without failing batch runs.
+
+---
+
+## 📂 Deep Dive Documentation
 
 To maintain high developer experience and engineering modularity, detailed architectural analysis, design decisions, and security evaluations are organized in dedicated documents:
 
-* 📐 **[Architecture & Data Design](docs/ARCHITECTURE.md)**:
+* 💡 **[Case Study Design Questions](DESIGN_QUESTIONS.md)**:
+  * Responses to Questions 1, 2, and 3 covering enterprise-scale data ingestion, continuous API sync with historical revision handling, and tailored tooling for Power BI and Python analysts.
+
+* 📐 **[System Architecture & Data Design](docs/ARCHITECTURE.md)**:
   * ETL Pipeline Architecture & Multi-tier Entity Resolution ([`app/pipeline.py:DataCleaningPipeline`](app/pipeline.py#L21)).
   * Relational schema design, normalization, and compound indexing strategies ([`app/models.py`](app/models.py#L65)).
   * Key architectural assumptions, trade-offs (SQLite vs. PostgreSQL, synchronous vs. asynchronous I/O).
@@ -148,11 +166,6 @@ To maintain high developer experience and engineering modularity, detailed archi
   * OWASP API Security risk prioritization and implemented mitigations.
   * Container non-root execution and parameterization defenses.
   * Enterprise Cloud Roadmap: Protected B compliance, Managed Identity (RBAC), and Private Endpoints.
-
-* 📡 **[Cloud-native Logging & Incident Traceability](app/main.py#L33)**
-  * Dual-channel routing (`stdout` & local persistent logs)
-  * Asynchronous HTTP telemetry & anomaly tracing (2xx/4xx/5xx)
-  * Resilient ETL execution & Dead-Letter Queue (DLQ) audit trail
 ---
 
 ### AI Tool Usage Disclosure
