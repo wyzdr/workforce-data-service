@@ -149,7 +149,7 @@ To maintain high developer experience and engineering modularity, detailed archi
   * Container non-root execution and parameterization defenses.
   * Enterprise Cloud Roadmap: Protected B compliance, Managed Identity (RBAC), and Private Endpoints.
 
-* 📡 **Cloud-native Logging & Incident Traceability**
+* 📡 **[Cloud-native Logging & Incident Traceability](app/main.py#L28)**
   * Dual-channel routing (`stdout` & local persistent logs)
   * Asynchronous HTTP telemetry & anomaly tracing (2xx/4xx/5xx)
   * Resilient ETL execution & Dead-Letter Queue (DLQ) audit trail
