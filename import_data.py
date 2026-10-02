@@ -108,21 +108,14 @@ def run_import(excel_path: str = "data.xlsx", reset_schema: bool = False) -> Non
             clean_en = row["clean_long_name_en"]
             dept_id = idx + 1
 
-            name_fr = (
-                str(row["long_name_fr"]).strip()
-                if pd.notna(row.get("long_name_fr")) and str(row["long_name_fr"]).strip()
-                else clean_en
-            )
-            short_en = (
-                str(row["short_name_en"]).strip()
-                if pd.notna(row.get("short_name_en")) and str(row["short_name_en"]).strip()
-                else None
-            )
-            short_fr = (
-                str(row["short_name_fr"]).strip()
-                if pd.notna(row.get("short_name_fr")) and str(row["short_name_fr"]).strip()
-                else None
-            )
+            # Standardize all bilingual labels and acronyms using normalize_text to collapse irregular spaces
+            norm_fr = DataCleaningPipeline.normalize_text(row.get("long_name_fr"))
+            norm_short_en = DataCleaningPipeline.normalize_text(row.get("short_name_en"))
+            norm_short_fr = DataCleaningPipeline.normalize_text(row.get("short_name_fr"))
+
+            name_fr = norm_fr if norm_fr else clean_en
+            short_en = norm_short_en if norm_short_en else None
+            short_fr = norm_short_fr if norm_short_fr else None
 
             dept_obj = Department(
                 id=dept_id,
@@ -136,12 +129,12 @@ def run_import(excel_path: str = "data.xlsx", reset_schema: bool = False) -> Non
 
             # Register bilingual names and official acronyms to resolve to clean canonical key
             alias_map[clean_en] = clean_en
-            if name_fr:
-                alias_map[name_fr] = clean_en
-            if short_en:
-                alias_map[short_en] = clean_en
-            if short_fr:
-                alias_map[short_fr] = clean_en
+            if norm_fr:
+                alias_map[norm_fr] = clean_en
+            if norm_short_en:
+                alias_map[norm_short_en] = clean_en
+            if norm_short_fr:
+                alias_map[norm_short_fr] = clean_en
 
         db.bulk_save_objects(departments_to_insert)
         logger.info(
@@ -231,6 +224,7 @@ def run_import(excel_path: str = "data.xlsx", reset_schema: bool = False) -> Non
 
         unified_facts = pd.concat(frames, ignore_index=True)
 
+        # Execute cleaning pipeline: fuzzy entity reconciliation and tenure normalization
         unified_facts["clean_dept"] = unified_facts["department"].apply(
             pipeline.resolve_department
         )

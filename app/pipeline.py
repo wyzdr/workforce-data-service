@@ -23,7 +23,7 @@ class DataCleaningPipeline:
     Automated data cleaning and entity resolution pipeline.
 
     Attributes:
-        canonical_map (Dict[str, str]): Normalized search key to canonical name mapping.
+        canonical_map (Dict[str, str]): Normalized lowercase search key to canonical name mapping.
         canonical_keys (List[str]): List of normalized canonical keys used for similarity search.
         cutoff (float): Minimum similarity ratio required to accept a fuzzy match.
         match_cache (Dict[str, Optional[str]]): Memoization table caching previous resolutions.
@@ -47,14 +47,15 @@ class DataCleaningPipeline:
         self.cutoff = similarity_cutoff
         self.canonical_map: Dict[str, str] = {}
 
+        # Store lookup keys in lowercase to ensure case-insensitive matching across tiers
         if isinstance(canonical_departments, dict):
             for alias, canonical_name in canonical_departments.items():
-                norm_alias = self.normalize_text(alias)
+                norm_alias = self.normalize_text(alias).lower()
                 if norm_alias:
                     self.canonical_map[norm_alias] = canonical_name
         else:
             for name in canonical_departments:
-                norm_name = self.normalize_text(name)
+                norm_name = self.normalize_text(name).lower()
                 if norm_name:
                     self.canonical_map[norm_name] = name
 
@@ -89,7 +90,7 @@ class DataCleaningPipeline:
         Resolve an incoming organization string against canonical department entities.
 
         Resolution Strategy:
-        1. Exact Match: Immediate lookup against canonical key set (supports aliases).
+        1. Exact Match: Case-insensitive immediate lookup against canonical dictionary.
         2. Cache Lookup: Check memoized resolutions for repetitive dirty inputs.
         3. Fuzzy Match: Compute token similarity using difflib with threshold cutoff.
         4. Quarantine (DLQ): Log unresolved anomalies for auditor review and return None.
@@ -100,11 +101,11 @@ class DataCleaningPipeline:
         Returns:
             Optional[str]: Canonical department long name, or None if quarantined.
         """
-        norm_name = self.normalize_text(raw_name)
+        norm_name = self.normalize_text(raw_name).lower()
         if not norm_name:
             return None
 
-        # Tier 1: Exact match against normalized alias/name dictionary
+        # Tier 1: Exact match against normalized alias/name dictionary (case-insensitive)
         if norm_name in self.canonical_map:
             return self.canonical_map[norm_name]
 
@@ -112,7 +113,7 @@ class DataCleaningPipeline:
         if norm_name in self.match_cache:
             return self.match_cache[norm_name]
 
-        # Tier 3: Fuzzy matching (Levenshtein distance heuristic)
+        # Tier 3: Fuzzy matching (Levenshtein distance heuristic on lowercase keys)
         matches = difflib.get_close_matches(
             norm_name, self.canonical_keys, n=1, cutoff=self.cutoff
         )

@@ -27,6 +27,9 @@ def sample_pipeline():
         "Canadian Food Inspection Agency": "Canadian Food Inspection Agency",
         "Agence canadienne d’inspection des aliments": "Canadian Food Inspection Agency",
         "CFIA": "Canadian Food Inspection Agency",
+        "Privy Council Office": "Privy Council Office",
+        "Bureau du Conseil privé": "Privy Council Office",
+        "PCO": "Privy Council Office",
     }
     return DataCleaningPipeline(canonical_departments=canonical_dict, similarity_cutoff=0.8)
 
@@ -86,7 +89,17 @@ def test_resolve_cfia_acronym_and_bilingual(sample_pipeline):
 
 
 def test_resolve_fuzzy_match_and_memoization(sample_pipeline):
-    """Verify Tier 3 fuzzy matching reconciles typos and verifies Tier 2 memoization cache."""
+    """
+    Verify Tier 3 fuzzy matching reconciles typos and verifies Tier 2 memoization cache.
+    Includes real-world raw typo 'Privy Council Officee'.
+    """
+    # 1. Typo of 'Privy Council Officee'
+    pco_typo = "Privy Council Officee"
+    resolved_pco = sample_pipeline.resolve_department(pco_typo)
+    assert resolved_pco == "Privy Council Office"
+    assert "privy council officee" in sample_pipeline.match_cache
+
+    # 2. Missing trailing letters
     typo_name = "Department of Financ"  # Slight typo
     
     # First invocation: fuzzy matching via difflib
