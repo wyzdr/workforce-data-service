@@ -9,10 +9,13 @@ Provides resilient ETL preprocessing mechanisms:
 """
 
 import difflib
+import logging
 import os
 import re
 from typing import Any, Dict, List, Optional, Union
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 class DataCleaningPipeline:
@@ -202,8 +205,10 @@ class DataCleaningPipeline:
         if self.quarantine_records:
             df = pd.DataFrame(self.quarantine_records).drop_duplicates()
             df.to_csv(filepath, index=False, encoding="utf-8-sig")
-            print(
-                f"    [Quarantine Alert] {len(df)} unmatched or unconverted records preserved in '{filepath}' for audit review."
+            logger.warning(
+                "[Quarantine Alert] %d unmatched or unconverted records preserved in '%s' for audit review.",
+                len(df),
+                filepath,
             )
         else:
             if os.path.exists(filepath):
@@ -211,6 +216,6 @@ class DataCleaningPipeline:
                     os.remove(filepath)
                 except OSError:
                     pass
-            print(
-                "    [Pipeline Clean] 100% records successfully matched against canonical dimension."
+            logger.info(
+                "[Pipeline Clean] 100%% records successfully matched against canonical dimension."
             )

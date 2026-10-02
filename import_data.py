@@ -10,12 +10,30 @@ Executes end-to-end data processing:
 """
 
 import argparse
+import logging
 import os
+import sys
 from typing import Dict, List
 import pandas as pd
 from app.database import Base, SessionLocal, engine
 from app.models import Department, QuarterlyFte
 from app.pipeline import DataCleaningPipeline
+
+# Logging persistent (sys.stdout and pipeline.log)
+LOG_FORMAT = "%(asctime)s [%(levelname)s] [%(name)s]: %(message)s"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+logger = logging.getLogger("ETL_Pipeline")
+logger.setLevel(logging.INFO)
+
+if not logger.handlers:
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=DATE_FORMAT))
+    logger.addHandler(stream_handler)
+
+    file_handler = logging.FileHandler("pipeline.log", mode="a", encoding="utf-8")
+    file_handler.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=DATE_FORMAT))
+    logger.addHandler(file_handler)
 
 
 def run_import(excel_path: str = "data.xlsx", reset_schema: bool = False) -> None:
@@ -41,9 +59,9 @@ def run_import(excel_path: str = "data.xlsx", reset_schema: bool = False) -> Non
                 f"Cannot find '{excel_path}'. Please ensure data.xlsx is in the root or data/ directory."
             )
 
-    print("--> [1/4] Connecting to database and verifying schema...")
+    logger.info("--> [1/4] Connecting to database and verifying schema...")
     if reset_schema:
-        print("    [Notice] Explicit schema reset requested. Dropping all tables...")
+        logger.warning("[Notice] Explicit schema reset requested. Dropping all tables...")
         Base.metadata.drop_all(bind=engine)
 
     Base.metadata.create_all(bind=engine)
@@ -54,9 +72,13 @@ def run_import(excel_path: str = "data.xlsx", reset_schema: bool = False) -> Non
         deleted_facts = db.query(QuarterlyFte).delete()
         deleted_depts = db.query(Department).delete()
         if deleted_facts > 0 or deleted_depts > 0:
-            print(f"    [Clean] Flushed existing records ({deleted_facts} facts, {deleted_depts} depts) for fresh ingestion.")
+            logger.info(
+                "[Clean] Flushed existing records (%d facts, %d depts) for fresh ingestion.",
+                deleted_facts,
+                deleted_depts,
+            )
 
-        print(f"--> [2/4] Reading Excel workbook: {excel_path} ...")
+        logger.info("--> [2/4] Reading Excel workbook: %s ...", excel_path)
         xls = pd.ExcelFile(excel_path)
 
         # 1. Ingest and deduplicate canonical Departments dimension
@@ -122,8 +144,10 @@ def run_import(excel_path: str = "data.xlsx", reset_schema: bool = False) -> Non
                 alias_map[short_fr] = clean_en
 
         db.bulk_save_objects(departments_to_insert)
-        print(
-            f"    [OK] Prepared {len(departments_to_insert)} canonical departments ({len(alias_map)} bilingual alias entries indexed)."
+        logger.info(
+            "[OK] Prepared %d canonical departments (%d bilingual alias entries indexed).",
+            len(departments_to_insert),
+            len(alias_map),
         )
 
         # 2. Initialize cleaning pipeline with comprehensive alias registry
@@ -133,7 +157,7 @@ def run_import(excel_path: str = "data.xlsx", reset_schema: bool = False) -> Non
         )
 
         # 3. Dynamic fact sheet discovery and ingestion adhering to accounting discipline
-        print("--> [3/4] Scanning and ingesting fact sheets dynamically...")
+        logger.info("--> [3/4] Scanning and ingesting fact sheets dynamically...")
         DIMENSION_SHEETS = {"departments"}
         REQUIRED_DIMS = ["date", "tenure", "department"]
         frames: List[pd.DataFrame] = []
@@ -147,7 +171,11 @@ def run_import(excel_path: str = "data.xlsx", reset_schema: bool = False) -> Non
 
             missing_dims = [col for col in REQUIRED_DIMS if col not in df.columns]
             if missing_dims:
-                print(f"    [Warning] Skipping sheet '{sheet_name}': missing required dimensions {missing_dims}.")
+                logger.warning(
+                    "Skipping sheet '%s': missing required dimensions %s.",
+                    sheet_name,
+                    missing_dims,
+                )
                 continue
 
             # Metric extraction branch
@@ -178,27 +206,31 @@ def run_import(excel_path: str = "data.xlsx", reset_schema: bool = False) -> Non
                             tenure=str(bad_row["tenure"]),
                             headcount=float(bad_row["headcount"]),
                         )
-                    print(
-                        f"    [Quarantine Enqueued] Sheet '{sheet_name}': {len(unconverted_rows)} records with "
-                        f"non-combined headcount quarantined to prevent unverified FTE inflation."
+                    logger.warning(
+                        "[Quarantine Enqueued] Sheet '%s': %d records with "
+                        "non-combined headcount quarantined to prevent unverified FTE inflation.",
+                        sheet_name,
+                        len(unconverted_rows),
                     )
 
                 sub_df = sub_df.drop(columns=["headcount"])
                 metric_desc = "'headcount' (restricted to 'combined' tenure only)"
 
             else:
-                print(f"    [Warning] Skipping sheet '{sheet_name}': neither 'fte' nor 'headcount' detected.")
+                logger.warning(
+                    "Skipping sheet '%s': neither 'fte' nor 'headcount' detected.",
+                    sheet_name,
+                )
                 continue
 
             frames.append(sub_df)
-            print(f"    [Ingested] Sheet '{sheet_name}' processed via metric {metric_desc}.")
+            logger.info("Sheet '%s' processed via metric %s.", sheet_name, metric_desc)
 
         if not frames:
             raise ValueError("No valid fact sheets found in the provided Excel workbook.")
 
         unified_facts = pd.concat(frames, ignore_index=True)
 
-        # Execute cleaning pipeline: fuzzy entity reconciliation and tenure normalization
         unified_facts["clean_dept"] = unified_facts["department"].apply(
             pipeline.resolve_department
         )
@@ -251,8 +283,9 @@ def run_import(excel_path: str = "data.xlsx", reset_schema: bool = False) -> Non
                 pivoted[col] = pivoted[col].fillna(0.0)
 
         # 4. Batch persist quarterly aggregated records
-        print(
-            f"--> [4/4] Writing {len(pivoted)} quarterly aggregated rows to database..."
+        logger.info(
+            "--> [4/4] Writing %d quarterly aggregated rows to database...",
+            len(pivoted),
         )
         records = [
             QuarterlyFte(
@@ -270,13 +303,14 @@ def run_import(excel_path: str = "data.xlsx", reset_schema: bool = False) -> Non
         db.bulk_save_objects(records)
 
         db.commit()
-        print(
-            f"    [OK] Successfully ingested {len(frames)} fact sheets into 'workforce.db'."
+        logger.info(
+            "[OK] Successfully ingested %d fact sheets into 'workforce.db'.",
+            len(frames),
         )
 
     except Exception as exc:
         db.rollback()
-        print(f"[Error] Pipeline execution failed: {exc}")
+        logger.error("Pipeline execution failed: %s", exc, exc_info=True)
         raise
     finally:
         db.close()
