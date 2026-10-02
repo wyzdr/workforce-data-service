@@ -1,5 +1,3 @@
-# Workforce Data Platform: Scaling, Synchronization & Analyst Experience
-
 ## Contents
 
 - [Question 1: Scaling to Tens of Millions of Records](#question-1-scaling-to-tens-of-millions-of-records)

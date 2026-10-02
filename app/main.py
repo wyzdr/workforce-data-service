@@ -103,32 +103,6 @@ def root_redirect():
     return RedirectResponse(url="/docs")
 
 
-@app.get("/health/live", tags=["Monitoring"])
-def liveness_probe():
-    """
-    Kubernetes / Azure App Service Liveness Probe.
-    Verifies that the application process is running and responsive.
-    """
-    return {"status": "alive"}
-
-
-@app.get("/health/ready", tags=["Monitoring"])
-def readiness_probe(db: Session = Depends(get_db)):
-    """
-    Kubernetes / Azure App Service Readiness Probe.
-    Verifies active database connectivity before directing traffic to the instance.
-    """
-    try:
-        db.execute(text("SELECT 1"))
-        return {"status": "ready", "database": "connected"}
-    except Exception as exc:
-        api_logger.error(f"Readiness probe DB check failed: {str(exc)}")
-        raise HTTPException(
-            status_code=503,
-            detail=f"Database connectivity check failed: {str(exc)}",
-        )
-
-
 @app.get(
     "/api/departments",
     response_model=DepartmentListResponse,
@@ -243,3 +217,33 @@ def get_department_fte(
         fte_list.append(entry)
 
     return DepartmentFteResponse(fte_per_quarter=fte_list)
+
+
+# ------------------------------------------------------------------------------
+# Monitoring
+# ------------------------------------------------------------------------------
+@app.get("/health/live", tags=["Monitoring"])
+def liveness_probe():
+    """
+    Kubernetes / Azure App Service Liveness Probe.
+    Verifies that the application process is running and responsive.
+    """
+    return {"status": "alive"}
+
+
+@app.get("/health/ready", tags=["Monitoring"])
+def readiness_probe(db: Session = Depends(get_db)):
+    """
+    Kubernetes / Azure App Service Readiness Probe.
+    Verifies active database connectivity before directing traffic to the instance.
+    """
+    try:
+        db.execute(text("SELECT 1"))
+        return {"status": "ready", "database": "connected"}
+    except Exception as exc:
+        api_logger.error(f"Readiness probe DB check failed: {str(exc)}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Database connectivity check failed: {str(exc)}",
+        )
+
