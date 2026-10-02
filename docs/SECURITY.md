@@ -24,7 +24,7 @@ Security risks were evaluated and prioritized based on vulnerability severity, e
 
 * **Strict Type Safety**: Query parameters are typed and parsed via Pydantic/FastAPI (`id: int`, `year: Optional[int]`). Any malformed input (e.g., passing string characters into `id`) fails at the gateway layer with HTTP 422 before reaching business logic.
 * **Zero Hardcoded Secrets**: No database passwords, private keys, or API tokens are checked into the repository. Configuration parameters are externalized through environment variables.
-* **Probes for Cluster Health**: Orchestration platforms (Kubernetes / Azure App Service) can continuously verify process liveness ([`/health/live`](../app/main.py#L225)) and database connectivity readiness ([`/health/ready`](../app/main.py#L43)) to prevent routing traffic to unhealthy instances.
+* **Probes for Cluster Health**: Orchestration platforms (Kubernetes / Azure App Service) can continuously verify process liveness ([`/health/live`](../app/main.py#L225)) and database connectivity readiness ([`/health/ready`](../app/main.py#L234)) to prevent routing traffic to unhealthy instances.
 
 ### 2.2 Container & Supply Chain Security
 
