@@ -18,7 +18,7 @@ Here is how we can evolve the architecture:
 
 - **Bypass ORM Overhead:** Instantiating millions of SQLAlchemy ORM objects (`db.bulk_save_objects`) creates massive memory and CPU overhead. Instead, use database-native bulk loaders like PostgreSQL’s `COPY` command or cloud ETL bulk loaders (e.g., Azure Data Factory bulk copy), cutting write latency by 10x–50x.
 
-- **Decouple with Message Queues:** Decouple file ingestion from the user-facing API using an event-driven queue (e.g., Celery backed by Redis, or Kafka). Dedicated background workers clean and validate batches in parallel without starving API threads of CPU and I/O resources.
+- **Decouple with Message Queues:** Decouple file ingestion from the user-facing API using an event-driven queue (e.g. Kafka). Dedicated background workers clean and validate batches in parallel without starving API threads of CPU and I/O resources.
 
 ### 2. Database & Analytical Storage
 
