@@ -22,7 +22,7 @@ External records seldom arrive clean. The data ingestion process ([`import_data.
 
 ### 2.1 Tackling Real Dirty Data in `data.xlsx`
 During source data exploration, our pipeline encountered and resolved several tangible data traps:
-* **Invisible Whitespace & Escaped Characters**: Department strings frequently contained trailing tabs, multiple contiguous spaces, and embedded line breaks (e.g., `"Department of Finance \n"` vs `"Department of Finance"`). Our pipeline applies text normalization ([`DataCleaningPipeline.normalize_text`](../app/pipeline.py#L71)) before any matching.
+* **Invisible Whitespace & Escaped Characters**: Department strings frequently contained trailing tabs, contiguous spaces, duplicates and typos (e.g., `"Privy Council Officee"` vs `"Privy Council Office"`). Our pipeline applies text normalization ([`DataCleaningPipeline.normalize_text`](../app/pipeline.py#L71)) before any matching.
 * **Bilingual Inconsistencies & Acronym Drifts**: Entities reported alternatively by their English name, French name, or operational acronyms (e.g., `"ASC"` vs `"Accessibility Standards Canada"` vs `"Normes d'accessibilité Canada"`). The pipeline dynamically builds a multi-key index from canonical metadata sheets.
 * **Typographical Variants**: Near-miss spelling differences are caught using Levenshtein distance heuristics ([`difflib.get_close_matches`](../app/pipeline.py#L117) with a 0.85 confidence cutoff), preventing dropped records without manual intervention.
 
@@ -97,7 +97,7 @@ erDiagram
 
 ---
 
-## 4. Assessment Context: Architectural Trade-Offs
+## 4. Architectural Trade-Offs
 
 Given the scope of this take-home exercise, architectural choices were selected to maximize evaluator portability while maintaining enterprise upgrade paths:
 
@@ -111,7 +111,7 @@ Given the scope of this take-home exercise, architectural choices were selected 
 
 ## 5. Supporting PBO Analysts & Downstream Workflows
 
-The system architecture addresses the practical needs of adapting data delivery to analytical staff and policy researchers:
+The architecture addresses the practical needs of adapting data delivery to analytical staff and policy researchers:
 
 * **Frictionless Consumption Across Toolchains**:
   * PBO analysts rely on diverse workflows ranging from statistical environments (R, Python) to spreadsheet modeling (Excel, Power BI).

@@ -144,7 +144,7 @@ python -m pytest --cov=app tests/ -v
 ## 📡 Cloud-native Logging & Incident Traceability
 
 * **Dual-Channel Logging**: Log events stream to standard output (`stdout`) for cloud/container log collectors (e.g., Azure Monitor, CloudWatch) while simultaneously writing persistent local audit records (`api_access.log`, `pipeline.log`).
-* **HTTP Telemetry & Anomaly Tracing**: Custom middleware captures request latency, client IP hashes, and categorizes HTTP response codes (2xx/4xx/5xx) for rapid root-cause analysis ([`app/main.py:AuditLoggingMiddleware`](app/main.py)).
+* **HTTP Telemetry & Anomaly Tracing**: Custom middleware captures request latency, client IP hashes, and categorizes HTTP response codes (2xx/4xx/5xx) for rapid root-cause analysis ([`app/main.py:AuditLoggingMiddleware`](app/main.py#L58)).
 * **ETL Dead-Letter Queue (DLQ)**: Ingestion anomalies (unmatched organizations, unconverted headcount metrics) are quarantined into `data_quarantine.csv` with granular failure reasons, preserving an immutable audit trail without failing batch runs.
 
 ---
